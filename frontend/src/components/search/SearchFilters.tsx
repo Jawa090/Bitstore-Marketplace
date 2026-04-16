@@ -55,9 +55,18 @@ function FilterContent({ filter, value, onChange }: { filter: FilterConfig; valu
     const max = config.max ?? 20000;
     const step = config.step ?? 100;
     const rangeValue = value || [min, max];
+    
     return (
       <div>
-        <Slider min={min} max={max} step={step} value={rangeValue} onValueChange={(v) => onChange(v as [number, number])} className="mb-2" />
+        {/* Simple Radix Slider with CSS class for color inversion */}
+        <Slider 
+          min={min} 
+          max={max} 
+          step={step} 
+          value={rangeValue} 
+          onValueChange={(v) => onChange(v as [number, number])} 
+          className="mb-2 price-range-inverted" 
+        />
         <div className="flex justify-between text-[11px] text-muted-foreground font-medium">
           <span className="bg-muted/60 px-2 py-0.5 rounded">AED {rangeValue[0].toLocaleString()}</span>
           <span className="bg-muted/60 px-2 py-0.5 rounded">AED {rangeValue[1].toLocaleString()}</span>

@@ -1,37 +1,3 @@
-# Project Structure
-# Frontend code is in /frontend directory
-# Backend code will be in /backend directory
-
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
-build/
-out/
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
 # Logs
 logs
 *.log
@@ -41,6 +7,57 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+build/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output
+
+# Temporary folders
+tmp/
+temp/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+
+# Package manager
+.pnpm-debug.log*
+.yarn-integrity
+
+# IDE
+*.swp
+*.swo
+*~
+
 # Runtime data
 pids
 *.pid
@@ -48,14 +65,11 @@ pids
 *.pid.lock
 
 # Coverage directory used by tools like istanbul
-coverage/
+coverage
 *.lcov
 
 # Dependency directories
 jspm_packages/
-
-# TypeScript cache
-*.tsbuildinfo
 
 # Optional npm cache directory
 .npm
@@ -88,10 +102,6 @@ jspm_packages/
 # Nuxt.js build / generate output
 .nuxt
 
-# Gatsby files
-.cache/
-public
-
 # Storybook build outputs
 .out
 .storybook-out
@@ -99,11 +109,3 @@ public
 # Temporary folders
 .tmp
 .temp
-
-# Vite cache
-.vite/
-
-# Playwright
-test-results/
-playwright-report/
-playwright/.cache/

@@ -13,6 +13,7 @@ import Signup from "./pages/Signup.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import Cart from "./pages/Cart.tsx";
+import Orders from "./pages/Orders.tsx";
 import Checkout from "./pages/Checkout.tsx";
 import OrderConfirmation from "./pages/OrderConfirmation.tsx";
 import VendorLayout from "./pages/vendor/VendorLayout.tsx";
@@ -25,6 +26,7 @@ import VendorAnalytics from "./pages/vendor/VendorAnalytics.tsx";
 import VendorSettings from "./pages/vendor/VendorSettings.tsx";
 import VendorApply from "./pages/vendor/VendorApply.tsx";
 import VendorPayouts from "./pages/vendor/VendorPayouts.tsx";
+import LanguageSettings from "./pages/LanguageSettings.tsx";
 import AdminLayout from "./pages/admin/AdminLayout.tsx";
 import AdminOverview from "./pages/admin/AdminOverview.tsx";
 import AdminVendors from "./pages/admin/AdminVendors.tsx";
@@ -92,6 +94,7 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/cart" element={<Cart />} />
+              <Route path="/orders" element={<Orders />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
               <Route path="/wholesale" element={<Wholesale />} />
@@ -103,6 +106,7 @@ const App = () => (
               <Route path="/trade-in" element={<TradeIn />} />
               <Route path="/accessories" element={<Accessories />} />
               <Route path="/dropshipping" element={<Dropshipping />} />
+              <Route path="/settings/language" element={<LanguageSettings />} />
               <Route path="/vendor/apply" element={<VendorApply />} />
               <Route path="/vendor" element={<VendorLayout />}>
                 <Route index element={<VendorOverview />} />

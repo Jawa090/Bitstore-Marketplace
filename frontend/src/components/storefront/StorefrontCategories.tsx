@@ -69,44 +69,46 @@ const StorefrontCategories = () => {
   const cats = content.categories;
 
   return (
-    <section className="py-5 lg:py-8 bg-background overflow-hidden">
-      <div className="px-3 lg:px-6 mb-4">
-        <h2 className="text-base lg:text-lg font-bold text-foreground tracking-tight">{content.title}</h2>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{content.subtitle}</p>
-      </div>
+    <section className="py-5 lg:py-8 bg-background">
+      <div className="container">
+        <div className="px-3 lg:px-6 mb-4">
+          <h2 className="text-base lg:text-lg font-bold text-foreground tracking-tight">{content.title}</h2>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{content.subtitle}</p>
+        </div>
 
-      <div className="relative">
-        <div className="flex animate-marquee-categories gap-3 w-max">
-          {[...cats, ...cats].map((cat, i) => {
-            const Icon = iconLookup[cat.icon] || Package;
-            return (
-              <Link
-                key={`${cat.name}-${i}`}
-                to={cat.link}
-                className="group relative overflow-hidden rounded-xl w-[140px] h-[100px] shrink-0 border border-border/50 bg-card hover:border-primary/40 transition-all"
-              >
-                {cat.image_url ? (
-                  <img
-                    src={cat.image_url}
-                    alt={cat.name}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className={`absolute inset-0 bg-gradient-to-br ${cat.color || "from-primary to-primary"} flex items-center justify-center`}>
-                    <Icon className="h-8 w-8 text-white/70" />
+        <div className="relative overflow-hidden">
+          <div className="flex animate-marquee-categories gap-3 w-max">
+            {[...cats, ...cats].map((cat, i) => {
+              const Icon = iconLookup[cat.icon] || Package;
+              return (
+                <Link
+                  key={`${cat.name}-${i}`}
+                  to={cat.link}
+                  className="group relative overflow-hidden rounded-xl w-[140px] h-[100px] shrink-0 border border-border/50 bg-card hover:border-primary/40 transition-all"
+                >
+                  {cat.image_url ? (
+                    <img
+                      src={cat.image_url}
+                      alt={cat.name}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className={`absolute inset-0 bg-gradient-to-br ${cat.color || "from-primary to-primary"} flex items-center justify-center`}>
+                      <Icon className="h-8 w-8 text-white/70" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-2">
+                    <span className="text-[11px] font-semibold text-white drop-shadow-md">{cat.name}</span>
                   </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-2">
-                  <span className="text-[11px] font-semibold text-white drop-shadow-md">{cat.name}</span>
-                </div>
-                {cat.tag && (
-                  <span className="absolute top-1.5 right-1.5 text-xs leading-none drop-shadow-md">{cat.tag}</span>
-                )}
-              </Link>
-            );
-          })}
+                  {cat.tag && (
+                    <span className="absolute top-1.5 right-1.5 text-xs leading-none drop-shadow-md">{cat.tag}</span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
