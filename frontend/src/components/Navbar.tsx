@@ -230,8 +230,21 @@ const Navbar = () => {
             {/* User Account */}
             {user ? (
               <div className="hidden sm:flex items-center">
+                {/* Avatar */}
+                {user.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.full_name}
+                    className="h-8 w-8 rounded-full object-cover border-2 border-primary/30"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary/15 border-2 border-primary/30 flex items-center justify-center text-xs font-bold text-primary">
+                    {(user.full_name || user.email)[0].toUpperCase()}
+                  </div>
+                )}
                 <div className="flex flex-col text-xs text-muted-foreground hover:text-foreground cursor-pointer px-2">
-                  <span className="text-[10px]">Hello, {user.email.split('@')[0]}</span>
+                  <span className="text-[10px]">Hello, {user.full_name || user.email.split('@')[0]}</span>
                   <span className="font-semibold">Account & Lists</span>
                 </div>
                 <Link to="/vendor">
@@ -403,8 +416,19 @@ const Navbar = () => {
                 </Link>
               ) : (
                 <div className="flex items-center gap-2.5 text-foreground py-3 px-3 rounded-lg bg-muted/60 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" /> 
-                  Hello, {user.email.split('@')[0]}
+                  {user.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={user.full_name}
+                      className="h-7 w-7 rounded-full object-cover border border-primary/30"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="h-7 w-7 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                      {(user.full_name || user.email)[0].toUpperCase()}
+                    </div>
+                  )}
+                  Hello, {user.full_name || user.email.split('@')[0]}
                 </div>
               )}
 

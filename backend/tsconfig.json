@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    /* Language & Environment */
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+
+    /* TypeORM requires these two */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    /* Module Resolution */
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+
+    /* Output */
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    /* Strict Checks */
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+
+    /* Source Maps */
+    "sourceMap": true,
+    "declaration": true,
+
+    /* Path Aliases (optional — uncomment if needed) */
+    // "baseUrl": "./src",
+    // "paths": {
+    //   "@/*": ["./*"]
+    // }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"],
+  "ts-node": {
+    "files": true,
+    "transpileOnly": false
+  }
+}

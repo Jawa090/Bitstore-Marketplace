@@ -8,6 +8,7 @@ import { Mail, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useThemeImage } from "@/hooks/useThemeImage";
+import { forgotPassword } from "@/lib/api";
 
 const ForgotPassword = () => {
   const logo = useThemeImage("logo");
@@ -19,14 +20,14 @@ const ForgotPassword = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setLoading(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
+    try {
+      await forgotPassword(email);
       setSent(true);
+    } catch {
+      // Always show the same success state — never leak whether the email exists
+      setSent(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,9 +52,11 @@ const ForgotPassword = () => {
             {sent ? (
               <div className="text-center py-6 space-y-3">
                 <CheckCircle className="h-12 w-12 text-primary mx-auto" />
-                <h2 className="text-lg font-semibold text-foreground">Check your email</h2>
+                <h2 className="text-lg font-semibold text-foreground">Check your inbox</h2>
                 <p className="text-sm text-muted-foreground">
-                  We sent a reset link to <span className="text-foreground font-medium">{email}</span>
+                  If an account exists for{" "}
+                  <span className="text-foreground font-medium">{email}</span>,
+                  a password reset link has been sent. Check your spam folder if you don't see it.
                 </p>
               </div>
             ) : (
@@ -80,7 +83,10 @@ const ForgotPassword = () => {
             )}
           </CardContent>
           <CardFooter className="justify-center">
-            <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+            <Link
+              to="/login"
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
               <ArrowLeft className="h-4 w-4" /> Back to sign in
             </Link>
           </CardFooter>
