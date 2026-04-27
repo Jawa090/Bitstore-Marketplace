@@ -21,7 +21,7 @@ export class Profile {
   @Column({ type: "uuid", unique: true })
   user_id: string;
 
-  @OneToOne(() => User, { onDelete: "CASCADE" })
+  @OneToOne(() => User, (user) => user.profile, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user: User;
 

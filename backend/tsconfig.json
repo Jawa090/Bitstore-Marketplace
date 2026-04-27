@@ -28,13 +28,7 @@
 
     /* Source Maps */
     "sourceMap": true,
-    "declaration": true,
-
-    /* Path Aliases (optional — uncomment if needed) */
-    // "baseUrl": "./src",
-    // "paths": {
-    //   "@/*": ["./*"]
-    // }
+    "declaration": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"],

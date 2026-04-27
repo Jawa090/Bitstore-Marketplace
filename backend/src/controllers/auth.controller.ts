@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import * as AuthService from "../services/auth.service";
 import { sendCreated, sendSuccess, sendError } from "../utils/response";
 import { AppError } from "../utils/AppError";
-import redisClient from "../config/redis";
+import redisClient, { blacklistToken } from "../config/redis";
 
 // ─────────────────────────────────────────────────────────────────────
 // POST /api/auth/register
@@ -107,10 +107,7 @@ export const logout = async (
     // Decode without re-verifying — we only need the expiry timestamp.
     const decoded = jwt.decode(token) as { exp?: number } | null;
     if (decoded?.exp) {
-      const ttl = decoded.exp - Math.floor(Date.now() / 1000);
-      if (ttl > 0) {
-        await redisClient.setEx(token, ttl, "blacklisted");
-      }
+      await blacklistToken(token, decoded.exp);
     }
 
     sendSuccess(res, "Logged out successfully");

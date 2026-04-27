@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { productService } from "@/services/api/product.service";
 
 type SortOption = "newest" | "price-asc" | "price-desc" | "name";
 
@@ -21,31 +22,25 @@ const CollectionPage = () => {
   const [brandFilter, setBrandFilter] = useState<string>("");
   const [conditionFilter, setConditionFilter] = useState<string>("");
 
-  const { data: collection, isLoading } = useQuery({
-    queryKey: ["collection-page", slug],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("collections")
-        .select("*, collection_products(display_order, products:product_id(*, product_images(*), vendors(store_name)))")
-        .eq("slug", slug!)
-        .eq("is_active", true)
-        .single();
-      if (error) throw error;
-      return data;
-    },
+  // For now, we'll fetch all products and filter client-side
+  // In a real implementation, you'd have a collections API
+  const { data: productsData, isLoading } = useQuery({
+    queryKey: ["collection-products", slug, search, sort, brandFilter, conditionFilter],
+    queryFn: () => productService.getProducts({
+      search: search || undefined,
+      brand_id: brandFilter || undefined,
+      condition: conditionFilter || undefined,
+      sort_by: sort === "price-asc" ? "price" : sort === "price-desc" ? "price" : sort === "name" ? "name" : "created_at",
+      sort_order: sort === "price-asc" ? "asc" : "desc",
+      limit: 50,
+    }),
     enabled: !!slug,
   });
 
-  const products = useMemo(() => {
-    if (!collection?.collection_products) return [];
-    return (collection.collection_products as any[])
-      .sort((a, b) => a.display_order - b.display_order)
-      .map((cp) => cp.products)
-      .filter(Boolean);
-  }, [collection]);
+  const products = productsData?.products || [];
 
   const brands = useMemo(() => {
-    const set = new Set(products.map((p: any) => p.brand));
+    const set = new Set(products.map((p: any) => p.brand?.name).filter(Boolean));
     return Array.from(set).sort();
   }, [products]);
 
@@ -53,39 +48,6 @@ const CollectionPage = () => {
     const set = new Set(products.map((p: any) => p.condition));
     return Array.from(set).sort();
   }, [products]);
-
-  const filtered = useMemo(() => {
-    let result = [...products];
-
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter((p: any) =>
-        p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q)
-      );
-    }
-    if (brandFilter) {
-      result = result.filter((p: any) => p.brand === brandFilter);
-    }
-    if (conditionFilter) {
-      result = result.filter((p: any) => p.condition === conditionFilter);
-    }
-
-    switch (sort) {
-      case "price-asc":
-        result.sort((a: any, b: any) => a.price - b.price);
-        break;
-      case "price-desc":
-        result.sort((a: any, b: any) => b.price - a.price);
-        break;
-      case "name":
-        result.sort((a: any, b: any) => a.name.localeCompare(b.name));
-        break;
-      default:
-        break;
-    }
-
-    return result;
-  }, [products, search, sort, brandFilter, conditionFilter]);
 
   const hasActiveFilters = search || brandFilter || conditionFilter;
 
@@ -103,6 +65,13 @@ const CollectionPage = () => {
     refurbished: "Refurbished",
   };
 
+  // Mock collection data - in real app this would come from API
+  const collection = {
+    name: slug?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || "Collection",
+    description: "Discover our curated selection of premium products",
+    badge_text: "Featured"
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -112,7 +81,7 @@ const CollectionPage = () => {
         <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
           <Link to="/" className="hover:text-foreground transition-colors">Home</Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-foreground font-medium">{collection?.name || "Collection"}</span>
+          <span className="text-foreground font-medium">{collection.name}</span>
         </nav>
 
         {isLoading ? (
@@ -124,14 +93,6 @@ const CollectionPage = () => {
                 <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
               ))}
             </div>
-          </div>
-        ) : !collection ? (
-          <div className="text-center py-20">
-            <h1 className="text-2xl font-bold mb-2">Collection not found</h1>
-            <p className="text-muted-foreground mb-6">This collection doesn't exist or has been hidden.</p>
-            <Link to="/">
-              <Button>Back to Home</Button>
-            </Link>
           </div>
         ) : (
           <>
@@ -173,7 +134,7 @@ const CollectionPage = () => {
                     <SelectValue placeholder="Brand" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Brands</SelectItem>
+                    <SelectItem value="">All Brands</SelectItem>
                     {brands.map((b) => (
                       <SelectItem key={b} value={b}>{b}</SelectItem>
                     ))}
@@ -186,7 +147,7 @@ const CollectionPage = () => {
                     <SelectValue placeholder="Condition" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Conditions</SelectItem>
+                    <SelectItem value="">All Conditions</SelectItem>
                     {conditions.map((c) => (
                       <SelectItem key={c} value={c}>{conditionLabels[c] || c}</SelectItem>
                     ))}
@@ -212,11 +173,11 @@ const CollectionPage = () => {
             </div>
 
             {/* Product Grid */}
-            {filtered.length > 0 ? (
+            {products.length > 0 ? (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                {filtered.map((p: any, i: number) => {
-                  const primaryImage = p.product_images?.find((img: any) => img.is_primary)?.image_url
-                    || p.product_images?.[0]?.image_url
+                {products.map((p: any, i: number) => {
+                  const primaryImage = p.images?.find((img: any) => img.is_primary)?.image_url
+                    || p.images?.[0]?.image_url
                     || "/placeholder.svg";
                   return (
                     <motion.div
@@ -227,13 +188,13 @@ const CollectionPage = () => {
                     >
                       <ProductCard
                         name={p.name}
-                        brand={p.brand}
+                        brand={p.brand?.name || "Unknown"}
                         price={p.price}
                         originalPrice={p.original_price || undefined}
                         image={primaryImage}
                         rating={4.5}
                         reviews={0}
-                        vendor={(p.vendors as any)?.store_name || "BitStores"}
+                        vendor={p.vendor?.store_name || "BitStores"}
                         specs={{
                           ram: p.ram || "",
                           storage: p.storage || "",

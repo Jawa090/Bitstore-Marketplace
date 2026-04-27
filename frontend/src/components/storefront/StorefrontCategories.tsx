@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Smartphone, Laptop, Tablet, Headphones, Watch, Package, Flame,
   Gamepad2, Monitor, Camera, Speaker, Cpu, Cable, BatteryCharging,
@@ -6,6 +7,8 @@ import {
   Keyboard, Mic, Projector, Usb, CircuitBoard,
 } from "lucide-react";
 import { useStorefrontContent } from "@/hooks/useStorefrontContent";
+import { categoryService } from "@/services/api/category.service";
+import { brandService } from "@/services/api/brand.service";
 
 interface Category {
   name: string;
@@ -61,12 +64,129 @@ const iconLookup: Record<string, typeof Smartphone> = {
   mic: Mic, projector: Projector, usb: Usb, circuitboard: CircuitBoard,
 };
 
+// Helper function to get icon for category
+const getIconForCategory = (categoryName: string): string => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('phone') || name.includes('mobile')) return 'smartphone';
+  if (name.includes('laptop') || name.includes('computer')) return 'laptop';
+  if (name.includes('tablet') || name.includes('ipad')) return 'tablet';
+  if (name.includes('headphone') || name.includes('audio') || name.includes('earphone')) return 'headphones';
+  if (name.includes('watch')) return 'watch';
+  if (name.includes('gaming') || name.includes('game')) return 'gamepad';
+  if (name.includes('monitor') || name.includes('display')) return 'monitor';
+  if (name.includes('camera')) return 'camera';
+  if (name.includes('speaker')) return 'speaker';
+  if (name.includes('network') || name.includes('router') || name.includes('wifi')) return 'router';
+  if (name.includes('power') || name.includes('battery') || name.includes('charger')) return 'battery';
+  if (name.includes('printer')) return 'printer';
+  if (name.includes('cable') || name.includes('wire')) return 'cable';
+  if (name.includes('component') || name.includes('cpu') || name.includes('processor')) return 'cpu';
+  if (name.includes('tv') || name.includes('television')) return 'tv';
+  if (name.includes('storage') || name.includes('drive') || name.includes('ssd') || name.includes('hdd')) return 'harddrive';
+  if (name.includes('mouse') || name.includes('mice')) return 'mouse';
+  if (name.includes('keyboard')) return 'keyboard';
+  if (name.includes('mic') || name.includes('microphone')) return 'mic';
+  if (name.includes('projector')) return 'projector';
+  if (name.includes('motherboard') || name.includes('mainboard')) return 'circuitboard';
+  if (name.includes('accessory') || name.includes('accessories')) return 'usb';
+  return 'smartphone'; // default
+};
+
+// Helper function to get color for category
+const getColorForCategory = (categoryName: string): string => {
+  const name = categoryName.toLowerCase();
+  if (name.includes('phone') || name.includes('mobile')) return 'from-blue-500 to-blue-600';
+  if (name.includes('laptop') || name.includes('computer')) return 'from-emerald-500 to-emerald-600';
+  if (name.includes('tablet') || name.includes('ipad')) return 'from-orange-500 to-orange-600';
+  if (name.includes('headphone') || name.includes('audio')) return 'from-cyan-500 to-cyan-600';
+  if (name.includes('watch')) return 'from-rose-500 to-rose-600';
+  if (name.includes('gaming') || name.includes('game')) return 'from-red-500 to-red-600';
+  if (name.includes('monitor') || name.includes('display')) return 'from-indigo-500 to-indigo-600';
+  if (name.includes('camera')) return 'from-amber-500 to-amber-600';
+  if (name.includes('speaker')) return 'from-teal-500 to-teal-600';
+  if (name.includes('network') || name.includes('router')) return 'from-sky-500 to-sky-600';
+  if (name.includes('power') || name.includes('battery')) return 'from-lime-500 to-lime-600';
+  if (name.includes('printer')) return 'from-gray-400 to-gray-500';
+  if (name.includes('cable') || name.includes('wire')) return 'from-zinc-400 to-zinc-500';
+  if (name.includes('component') || name.includes('cpu')) return 'from-purple-500 to-purple-600';
+  if (name.includes('tv') || name.includes('television')) return 'from-blue-600 to-blue-700';
+  if (name.includes('storage') || name.includes('drive')) return 'from-slate-500 to-slate-600';
+  if (name.includes('mouse') || name.includes('mice')) return 'from-pink-500 to-pink-600';
+  if (name.includes('keyboard')) return 'from-fuchsia-500 to-fuchsia-600';
+  if (name.includes('mic') || name.includes('microphone')) return 'from-yellow-500 to-yellow-600';
+  if (name.includes('projector')) return 'from-stone-500 to-stone-600';
+  if (name.includes('motherboard')) return 'from-green-500 to-green-600';
+  if (name.includes('accessory') || name.includes('accessories')) return 'from-neutral-500 to-neutral-600';
+  return 'from-primary to-primary'; // default
+};
+
 const StorefrontCategories = () => {
   const { data } = useStorefrontContent<CategoryData>("category_showcase", fallback);
 
+  // Fetch categories from backend
+  const { data: backendCategories = [] } = useQuery({
+    queryKey: ['storefront-categories'],
+    queryFn: categoryService.getCategories,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  // Fetch top brands from backend
+  const { data: backendBrands = [] } = useQuery({
+    queryKey: ['storefront-brands'],
+    queryFn: brandService.getBrands,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+
   if (!data?.is_active) return null;
   const content = data.content;
-  const cats = content.categories;
+
+  // Create categories from backend data
+  const dynamicCategories: Category[] = [];
+
+  // Add top brands first (Apple, Samsung, etc.)
+  const topBrands = backendBrands
+    .filter(brand => brand.is_active)
+    .sort((a, b) => a.display_order - b.display_order)
+    .slice(0, 3); // Top 3 brands
+
+  topBrands.forEach(brand => {
+    const brandName = brand.name;
+    dynamicCategories.push({
+      name: brandName === 'Apple' ? 'iPhones' : brandName,
+      icon: 'smartphone',
+      link: `/search?brand=${brand.id}`,
+      color: brandName === 'Apple' ? 'from-blue-500 to-blue-600' : 
+             brandName === 'Samsung' ? 'from-violet-500 to-violet-600' : 
+             'from-gray-500 to-gray-600'
+    });
+  });
+
+  // Add categories from backend
+  const activeCategories = backendCategories
+    .filter(cat => cat.is_active)
+    .sort((a, b) => a.display_order - b.display_order)
+    .slice(0, 15); // Limit to 15 categories
+
+  activeCategories.forEach(category => {
+    dynamicCategories.push({
+      name: category.name,
+      icon: getIconForCategory(category.name),
+      link: `/search?category=${category.id}`,
+      color: getColorForCategory(category.name)
+    });
+  });
+
+  // Add special deals at the end
+  dynamicCategories.push({
+    name: "Hot Deals",
+    icon: "flame",
+    link: "/search?deals=true",
+    color: "from-red-500 to-orange-500",
+    tag: "🔥"
+  });
+
+  // Use dynamic categories if available, otherwise fallback
+  const cats = dynamicCategories.length > 0 ? dynamicCategories : content.categories;
 
   return (
     <section className="py-5 lg:py-8 bg-background">

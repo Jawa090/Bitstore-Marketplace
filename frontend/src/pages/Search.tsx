@@ -1,17 +1,20 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal, X, Grid3X3, LayoutGrid } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import SearchFilters from "@/components/search/SearchFilters";
-import { mockProducts, mockFilterConfig } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { productService, type Product } from "@/services/api/product.service";
+import { categoryService } from "@/services/api/category.service";
+import { brandService } from "@/services/api/brand.service";
 
 const SORT_OPTIONS = [
   { value: "relevance", label: "Relevance" },
@@ -20,66 +23,96 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
 ];
 
-const FILTER_FIELD_MAP: Record<string, string> = {
-  brand: "brand", condition: "condition", storage: "storage", ram: "ram", color: "color",
-};
-
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
+  const initialCategory = searchParams.get("category") || "";
+  const initialBrand = searchParams.get("brand") || "";
   const isMobile = useIsMobile();
 
   const [searchTerm, setSearchTerm] = useState(initialQuery);
-  const [filterValues, setFilterValues] = useState<Record<string, any>>({});
+  const [filterValues, setFilterValues] = useState<Record<string, any>>({
+    category: initialCategory,
+    brand: initialBrand,
+  });
   const [sortBy, setSortBy] = useState("relevance");
   const [filtersOpen, setFiltersOpen] = useState(!isMobile);
   const [gridCols, setGridCols] = useState<3 | 4>(4);
 
-  const filterConfigs = mockFilterConfig;
+  // Fetch products from backend
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ['products', searchTerm, filterValues, sortBy],
+    queryFn: () => productService.getProducts({
+      search: searchTerm || undefined,
+      category_id: filterValues.category || undefined,
+      brand_id: filterValues.brand || undefined,
+      condition: filterValues.condition || undefined,
+      min_price: filterValues.priceRange?.[0] || undefined,
+      max_price: filterValues.priceRange?.[1] || undefined,
+      sort_by: sortBy === "price_asc" ? "price" : sortBy === "price_desc" ? "price" : sortBy === "newest" ? "created_at" : "created_at",
+      sort_order: sortBy === "price_asc" ? "asc" : "desc",
+      limit: 50,
+    }),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Fetch categories for filters
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: categoryService.getCategories,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch brands for filters
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands'],
+    queryFn: brandService.getBrands,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const products = productsData?.products || [];
+
+  // Create filter configs from backend data
+  const filterConfigs = [
+    {
+      id: "category",
+      label: "Category",
+      filter_type: "checkbox",
+      options: categories.filter(c => c.is_active).map(c => ({ value: c.id, label: c.name })),
+    },
+    {
+      id: "brand", 
+      label: "Brand",
+      filter_type: "checkbox",
+      options: brands.filter(b => b.is_active).map(b => ({ value: b.id, label: b.name })),
+    },
+    {
+      id: "condition",
+      label: "Condition",
+      filter_type: "checkbox", 
+      options: [
+        { value: "new", label: "New" },
+        { value: "used_like_new", label: "Like New" },
+        { value: "used_good", label: "Used - Good" },
+        { value: "used_fair", label: "Used - Fair" },
+        { value: "refurbished", label: "Refurbished" },
+      ],
+    },
+    {
+      id: "priceRange",
+      label: "Price Range",
+      filter_type: "range",
+      config: { min: 0, max: 20000, step: 100 },
+    },
+  ];
 
   const handleFilterChange = (filterId: string, value: any) => {
     setFilterValues((prev) => ({ ...prev, [filterId]: value }));
   };
 
-  const filtered = useMemo(() => {
-    let results = mockProducts.filter((p) => p.is_active);
-
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      results = results.filter((p) => p.name.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q));
-    }
-
-    for (const config of filterConfigs) {
-      const val = filterValues[config.id];
-      if (!val) continue;
-      if (config.filter_type === "range" && Array.isArray(val)) {
-        results = results.filter((p) => p.price >= val[0] && p.price <= val[1]);
-      } else if (Array.isArray(val) && val.length > 0) {
-        const field = FILTER_FIELD_MAP[config.id];
-        if (field) {
-          results = results.filter((p) => {
-            const productVal = (p as any)[field];
-            return productVal && val.includes(productVal);
-          });
-        } else if (config.id === "vendor") {
-          results = results.filter((p) => val.includes(p.vendor?.store_name));
-        }
-      }
-    }
-
-    switch (sortBy) {
-      case "price_asc": results.sort((a, b) => a.price - b.price); break;
-      case "price_desc": results.sort((a, b) => b.price - a.price); break;
-      case "newest": results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
-    }
-    return results;
-  }, [searchTerm, filterValues, filterConfigs, sortBy]);
-
   const activeFilterCount = Object.values(filterValues).filter((v) => {
     if (Array.isArray(v) && v.length === 2 && typeof v[0] === "number") {
-      const priceConfig = filterConfigs.find((f) => f.filter_type === "range")?.config;
-      if (priceConfig && v[0] === (priceConfig.min ?? 0) && v[1] === (priceConfig.max ?? 20000)) return false;
-      return true;
+      return v[0] !== 0 || v[1] !== 20000;
     }
     if (Array.isArray(v)) return v.length > 0;
     return !!v;
@@ -97,7 +130,12 @@ const SearchPage = () => {
         if (val[0] !== (pc.min ?? 0) || val[1] !== (pc.max ?? 20000))
           chips.push({ filterId: config.id, label: config.label, value: `AED ${val[0]}–${val[1]}` });
       } else if (Array.isArray(val)) {
-        val.forEach((v: string) => chips.push({ filterId: config.id, label: config.label, value: v }));
+        val.forEach((v: string) => {
+          const option = config.options?.find(opt => opt.value === v);
+          if (option) {
+            chips.push({ filterId: config.id, label: config.label, value: option.label });
+          }
+        });
       }
     }
     return chips;
@@ -106,7 +144,11 @@ const SearchPage = () => {
   const removeChip = (filterId: string, chipValue: string) => {
     const val = filterValues[filterId];
     if (Array.isArray(val) && typeof val[0] !== "number") {
-      handleFilterChange(filterId, val.filter((v: string) => v !== chipValue));
+      const config = filterConfigs.find(c => c.id === filterId);
+      const option = config?.options?.find(opt => opt.label === chipValue);
+      if (option) {
+        handleFilterChange(filterId, val.filter((v: string) => v !== option.value));
+      }
     } else {
       handleFilterChange(filterId, undefined);
     }
@@ -125,8 +167,14 @@ const SearchPage = () => {
                 {activeFilterCount > 0 && <Badge variant="secondary" className="ml-0.5 h-4 min-w-[16px] p-0 flex items-center justify-center text-[9px] rounded-full">{activeFilterCount}</Badge>}
               </Button>
               <span className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">{filtered.length}</span> results
-                {searchTerm && <span> for "<span className="font-medium text-foreground">{searchTerm}</span>"</span>}
+                {productsLoading ? (
+                  "Loading..."
+                ) : (
+                  <>
+                    <span className="font-semibold text-foreground">{products.length}</span> results
+                    {searchTerm && <span> for "<span className="font-medium text-foreground">{searchTerm}</span>"</span>}
+                  </>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -167,7 +215,7 @@ const SearchPage = () => {
                   <SearchFilters filterValues={filterValues} onFilterChange={handleFilterChange} />
                 </div>
                 <DrawerFooter>
-                  <DrawerClose asChild><Button className="w-full rounded-xl">Show {filtered.length} result{filtered.length !== 1 ? "s" : ""}</Button></DrawerClose>
+                  <DrawerClose asChild><Button className="w-full rounded-xl">Show {products.length} result{products.length !== 1 ? "s" : ""}</Button></DrawerClose>
                 </DrawerFooter>
               </DrawerContent>
             </Drawer>
@@ -192,7 +240,17 @@ const SearchPage = () => {
             )}
 
             <div className="flex-1 min-w-0">
-              {filtered.length === 0 ? (
+              {productsLoading ? (
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="bg-muted rounded-lg aspect-[3/4] mb-2" />
+                      <div className="bg-muted rounded h-4 mb-1" />
+                      <div className="bg-muted rounded h-3 w-2/3" />
+                    </div>
+                  ))}
+                </div>
+              ) : products.length === 0 ? (
                 <div className="text-center py-20">
                   <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-1">No products found</h3>
@@ -200,13 +258,25 @@ const SearchPage = () => {
                 </div>
               ) : (
                 <div className={`grid grid-cols-2 ${gridCols === 3 ? "lg:grid-cols-3" : "lg:grid-cols-3 xl:grid-cols-4"} gap-3`}>
-                  {filtered.map((p) => {
+                  {products.map((p: Product) => {
                     const primaryImage = p.images?.find((img) => img.is_primary)?.image_url || p.images?.[0]?.image_url || "/placeholder.svg";
                     return (
                       <motion.div key={p.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                        <ProductCard name={p.name} brand={p.brand} price={p.price} originalPrice={p.original_price || undefined}
-                          image={primaryImage} rating={4.5} reviews={0} vendor={p.vendor?.store_name || "BitStores"}
-                          specs={{ ram: p.ram || "–", storage: p.storage || "–", camera: p.camera || "–" }} slug={p.slug}
+                        <ProductCard 
+                          name={p.name} 
+                          brand={p.brand?.name || "Unknown"} 
+                          price={p.price} 
+                          originalPrice={p.original_price || undefined}
+                          image={primaryImage} 
+                          rating={4.5} 
+                          reviews={0} 
+                          vendor={p.vendor?.store_name || "BitStores"}
+                          specs={{ 
+                            ram: p.ram || "–", 
+                            storage: p.storage || "–", 
+                            camera: p.camera || "–" 
+                          }} 
+                          slug={p.slug}
                         />
                       </motion.div>
                     );

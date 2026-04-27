@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { authService } from "@/services/api/auth.service";
 import api from "@/lib/api";
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -102,21 +103,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Login ─────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
-    const response = await api.post("/auth/login", { email, password });
-    const { user: userData, accessToken, refreshToken } = response.data.data;
+    const { user: userData, tokens } = await authService.login({ email, password });
 
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
+    localStorage.setItem("accessToken", tokens.accessToken);
+    localStorage.setItem("refreshToken", tokens.refreshToken);
     setUser(userData);
   };
 
   // ── Google Login ──────────────────────────────────────────────
-  const loginWithGoogle = async (idToken: string) => {
-    const response = await api.post("/auth/google", { idToken });
-    const { user: userData, accessToken, refreshToken } = response.data.data;
+  const loginWithGoogle = async (credential: string) => {
+    const { user: userData, tokens } = await authService.googleAuth(credential);
 
-    localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
+    localStorage.setItem("accessToken", tokens.accessToken);
+    localStorage.setItem("refreshToken", tokens.refreshToken);
     setUser(userData);
   };
 
@@ -130,13 +129,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     emirate?: string;
   }) => {
     // We don't auto-login after signup — user is redirected to /login
-    await api.post("/auth/register", data);
+    await authService.register({
+      full_name: data.full_name,
+      email: data.email,
+      password: data.password,
+      phone: data.phone,
+      emirate: data.emirate
+    });
   };
 
   // ── Logout ────────────────────────────────────────────────────
   const signOut = async () => {
     try {
-      await api.post("/auth/logout");
+      await authService.logout();
     } catch {
       // Even if the API call fails, we still clear locally
     }

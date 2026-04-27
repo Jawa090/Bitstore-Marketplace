@@ -13,7 +13,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "bitstores",
 
   // ⚠️ DEVELOPMENT ONLY - Auto-create tables from entities
-  synchronize: false,
+  synchronize: true,
   
   // Show SQL queries in dev for debugging
   logging: process.env.NODE_ENV === "development",

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ChevronRight, Star, Share2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -18,29 +19,71 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trackProductView } from "@/lib/recentlyViewed";
 import { toast } from "@/hooks/use-toast";
-import { getProductBySlug } from "@/data/mockData";
+import { productService } from "@/services/api/product.service";
 
 const ProductDetail = () => {
   const { slug } = useParams<{ slug: string }>();
-  const product = slug ? getProductBySlug(slug) : undefined;
+  
+  // Fetch product from backend
+  const { data: product, isLoading, error } = useQuery({
+    queryKey: ['product', slug],
+    queryFn: () => productService.getProductBySlug(slug!),
+    enabled: !!slug,
+    retry: 1,
+  });
 
   useEffect(() => {
     if (!product) return;
     const primaryImg = product.images?.find((img) => img.is_primary)?.image_url || product.images?.[0]?.image_url || "/placeholder.svg";
     trackProductView({
-      id: product.id, slug: product.slug, name: product.name, brand: product.brand,
-      price: product.price, original_price: product.original_price || undefined,
-      image: primaryImg, vendor: product.vendor?.store_name || "BitStores",
-      ram: product.ram || undefined, storage: product.storage || undefined, camera: product.camera || undefined,
+      id: product.id, 
+      slug: product.slug, 
+      name: product.name, 
+      brand: product.brand?.name || "Unknown",
+      price: product.price, 
+      original_price: product.original_price || undefined,
+      image: primaryImg, 
+      vendor: product.vendor?.store_name || "BitStores",
+      ram: product.ram || undefined, 
+      storage: product.storage || undefined, 
+      camera: product.camera || undefined,
     });
   }, [product]);
 
-  if (!product) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container pt-24 pb-16">
+          <div className="animate-pulse">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+              <div className="lg:col-span-5">
+                <div className="bg-muted rounded-lg aspect-square" />
+              </div>
+              <div className="lg:col-span-4 space-y-4">
+                <div className="bg-muted rounded h-8 w-3/4" />
+                <div className="bg-muted rounded h-6 w-1/2" />
+                <div className="bg-muted rounded h-4 w-full" />
+                <div className="bg-muted rounded h-4 w-2/3" />
+              </div>
+              <div className="lg:col-span-3">
+                <div className="bg-muted rounded-lg h-64" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error || !product) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="container pt-24 pb-16 text-center">
           <h1 className="text-2xl font-bold mb-4">Product not found</h1>
+          <p className="text-muted-foreground mb-4">The product you're looking for doesn't exist or has been removed.</p>
           <Link to="/" className="text-primary hover:underline">← Back to Home</Link>
         </div>
         <Footer />
@@ -63,8 +106,12 @@ const ProductDetail = () => {
           <ChevronRight className="h-3 w-3" />
           <Link to="/search" className="hover:text-foreground transition-colors">Products</Link>
           <ChevronRight className="h-3 w-3" />
-          <Link to={`/search?brand=${product.brand}`} className="hover:text-foreground transition-colors">{product.brand}</Link>
-          <ChevronRight className="h-3 w-3" />
+          {product.brand && (
+            <>
+              <Link to={`/search?brand=${product.brand.id}`} className="hover:text-foreground transition-colors">{product.brand.name}</Link>
+              <ChevronRight className="h-3 w-3" />
+            </>
+          )}
           <span className="text-foreground truncate max-w-[200px]">{product.name}</span>
         </nav>
 
@@ -82,7 +129,9 @@ const ProductDetail = () => {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="lg:col-span-4 space-y-5">
             <div>
               <div className="flex items-center gap-2 mb-1.5">
-                <Link to={`/search?brand=${product.brand}`} className="text-xs font-semibold text-primary hover:underline">{product.brand}</Link>
+                {product.brand && (
+                  <Link to={`/search?brand=${product.brand.id}`} className="text-xs font-semibold text-primary hover:underline">{product.brand.name}</Link>
+                )}
               </div>
               <h1 className="text-xl lg:text-2xl font-bold leading-tight text-foreground">{product.name}</h1>
               <div className="flex items-center gap-3 mt-2">
@@ -99,8 +148,8 @@ const ProductDetail = () => {
 
             <div className="lg:hidden">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold">{product.currency} {product.price.toLocaleString()}</span>
-                {product.original_price && <span className="text-sm text-muted-foreground line-through">{product.currency} {product.original_price.toLocaleString()}</span>}
+                <span className="text-2xl font-bold">AED {product.price.toLocaleString()}</span>
+                {product.original_price && <span className="text-sm text-muted-foreground line-through">AED {product.original_price.toLocaleString()}</span>}
                 {discount > 0 && <span className="text-sm font-semibold text-primary">-{discount}%</span>}
               </div>
             </div>
@@ -113,11 +162,16 @@ const ProductDetail = () => {
               {product.warranty_months && <span className="px-3 py-1.5 rounded-lg bg-muted text-xs font-medium text-muted-foreground">{product.warranty_months}M Warranty</span>}
             </div>
 
-            <VariantSelector currentProductId={product.id} brand={product.brand} name={product.name} currentStorage={product.storage} currentColor={product.color} currentCondition={product.condition} />
-            <ProtectionPlan price={product.price} currency={product.currency} />
+            <VariantSelector currentProductId={product.id} brand={product.brand?.name || ""} name={product.name} currentStorage={product.storage} currentColor={product.color} currentCondition={product.condition} />
+            <ProtectionPlan price={product.price} currency="AED" />
 
             {product.vendor && (
-              <VendorInfo vendor={{ store_name: product.vendor.store_name, logo_url: product.vendor.logo_url, emirate: product.vendor.emirate, is_bitstores: product.vendor.is_bitstores }} />
+              <VendorInfo vendor={{ 
+                store_name: product.vendor.store_name, 
+                logo_url: undefined, 
+                emirate: undefined, 
+                is_bitstores: product.vendor.store_name === "BitStores" 
+              }} />
             )}
 
             {product.description && (
@@ -134,9 +188,17 @@ const ProductDetail = () => {
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-3">
             <div className="lg:sticky lg:top-24 space-y-4">
-              <AddToCart productId={product.id} price={product.price} originalPrice={product.original_price} currency={product.currency}
-                stock={product.stock_quantity} productName={product.name} imageUrl={images[0]} vendorId={product.vendor_id}
-                vendorName={product.vendor?.store_name ?? "Unknown"} slug={product.slug}
+              <AddToCart 
+                productId={product.id} 
+                price={product.price} 
+                originalPrice={product.original_price} 
+                currency="AED"
+                stock={product.stock_quantity} 
+                productName={product.name} 
+                imageUrl={images[0]} 
+                vendorId={product.vendor_id}
+                vendorName={product.vendor?.store_name ?? "Unknown"} 
+                slug={product.slug}
               />
             </div>
           </motion.div>
@@ -158,7 +220,7 @@ const ProductDetail = () => {
         </Tabs>
 
         <Separator className="my-10" />
-        <RelatedProducts currentProductId={product.id} brand={product.brand} />
+        <RelatedProducts currentProductId={product.id} brand={product.brand?.name || ""} />
       </div>
       <Footer />
     </div>

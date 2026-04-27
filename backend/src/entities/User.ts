@@ -4,9 +4,13 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
+  OneToMany,
   Index,
 } from "typeorm";
 import { Emirate } from "../utils/constants";
+import { Profile } from "./Profile";
+import { Address } from "./Address";
 
 @Entity("users")
 export class User {
@@ -52,6 +56,13 @@ export class User {
 
   @Column({ type: "boolean", default: false })
   email_verified: boolean;
+
+  // ── Relationships ───────────────────────────────────────────────
+  @OneToOne(() => Profile, (profile) => profile.user)
+  profile: Profile;
+
+  @OneToMany(() => Address, (address) => address.user)
+  addresses: Address[];
 
   // ── Timestamps ──────────────────────────────────────────────────
   @CreateDateColumn({ type: "timestamptz" })

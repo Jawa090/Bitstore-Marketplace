@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Search, ShoppingCart, User, Menu, X, LogOut, Store, Shield,
   Flame, Smartphone, Laptop, Tablet, Headphones, Watch, Gamepad2, Monitor,
@@ -14,8 +15,15 @@ import { useCart } from "@/contexts/CartContext";
 import { useStorefrontContent } from "@/hooks/useStorefrontContent";
 import { useStoreSettings } from "@/hooks/useStoreSettings";
 import { useThemeImage } from "@/hooks/useThemeImage";
+import { categoryService } from "@/services/api/category.service";
 
-interface NavLink { label: string; url: string; highlight?: boolean; position?: string; icon?: string; }
+interface NavLink { 
+  label: string; 
+  url: string; 
+  highlight?: boolean; 
+  position?: string; 
+  icon?: string; 
+}
 interface NavCatData { links: NavLink[]; }
 const defaultNavLinks: NavCatData = {
   links: [
@@ -38,6 +46,18 @@ const iconMap: Record<string, typeof Smartphone> = {
   headphones: Headphones, watch: Watch, gamepad: Gamepad2, monitor: Monitor,
 };
 
+// Helper function to map category names to icons
+const getIconForCategory = (categoryName: string): string => {
+  if (categoryName.includes('phone') || categoryName.includes('mobile')) return 'smartphone';
+  if (categoryName.includes('laptop') || categoryName.includes('computer')) return 'laptop';
+  if (categoryName.includes('tablet') || categoryName.includes('ipad')) return 'tablet';
+  if (categoryName.includes('headphone') || categoryName.includes('audio') || categoryName.includes('accessory')) return 'headphones';
+  if (categoryName.includes('watch')) return 'watch';
+  if (categoryName.includes('gaming') || categoryName.includes('game')) return 'gamepad';
+  if (categoryName.includes('monitor') || categoryName.includes('display')) return 'monitor';
+  return 'smartphone'; // default
+};
+
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,14 +73,46 @@ const Navbar = () => {
   const location = useLocation();
   const { data: settings } = useStoreSettings();
 
+  // Fetch categories from backend
+  const { data: categories = [], isLoading, error } = useQuery({
+    queryKey: ['categories'],
+    queryFn: categoryService.getCategories,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
+    retryDelay: 1000,
+  });
+
+  // Log error for debugging
+  if (error) {
+    console.error('Failed to fetch categories:', error);
+  }
+
   const defaultLogo = useThemeImage("logo");
   const logo = settings?.logo_url || defaultLogo;
   const storeName = settings?.store_name || "BitStores";
 
-  const { data: navCms } = useStorefrontContent<NavCatData>("nav_categories", defaultNavLinks);
-  const navLinks = navCms?.content?.links || defaultNavLinks.links;
-  const mainLinks = navLinks.filter(l => l.position !== "right");
-  const rightLinks = navLinks.filter(l => l.position === "right");
+  // Convert backend categories to nav links format - with safety check
+  const categoryLinks = (Array.isArray(categories) && categories.length > 0)
+    ? categories
+        .filter(cat => cat && cat.is_active)
+        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+        .slice(0, 8) // Limit to 8 categories for navbar
+        .map(cat => ({
+          label: cat.name,
+          url: `/search?category=${cat.slug}`,
+          icon: getIconForCategory(cat.name.toLowerCase())
+        }))
+    : [];
+
+  // Static special links
+  const specialLinks = [
+    { label: "Live Auctions", url: "/auctions", highlight: true },
+    { label: "Hot Deals", url: "/search?deals=true", highlight: true },
+    { label: "Sell on BitStores", url: "/vendor/apply", position: "right" },
+  ];
+
+  const mainLinks = [...categoryLinks, ...specialLinks.filter(l => !l.position)];
+  const rightLinks = specialLinks.filter(l => l.position === "right");
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 10);
@@ -114,12 +166,19 @@ const Navbar = () => {
             <div className="flex items-center">
               {/* Category Dropdown */}
               <div className="hidden md:flex">
-                <select className="h-10 lg:h-11 px-3 bg-muted border border-r-0 border-border rounded-l-md text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20">
-                  <option>All</option>
-                  <option>Electronics</option>
-                  <option>Phones</option>
-                  <option>Laptops</option>
-                  <option>Accessories</option>
+                <select 
+                  className="h-10 lg:h-11 px-3 bg-muted border border-r-0 border-border rounded-l-md text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      navigate(`/search?category=${e.target.value}`);
+                    }
+                  }}
+                  defaultValue=""
+                >
+                  <option value="">All</option>
+                  {(Array.isArray(categories) && categories.length > 0) && categories.filter(cat => cat && cat.is_active).map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
               
@@ -311,8 +370,8 @@ const Navbar = () => {
           </Link>
 
           {/* Category Links */}
-          {mainLinks.filter(l => !l.highlight).map((link) => {
-            const Icon = link.icon ? iconMap[link.icon] : null;
+          {mainLinks.filter(l => !('highlight' in l) || !l.highlight).map((link) => {
+            const Icon = ('icon' in link && link.icon) ? iconMap[link.icon] : null;
             const isActive = location.search ? link.url.includes(location.search) : false;
             return (
               <Link 
@@ -331,7 +390,7 @@ const Navbar = () => {
           })}
 
           {/* Special Deals */}
-          {mainLinks.filter(l => l.highlight).map((link) => (
+          {mainLinks.filter(l => ('highlight' in l) && l.highlight).map((link) => (
             <Link 
               key={link.label} 
               to={link.url} 
@@ -377,8 +436,20 @@ const Navbar = () => {
               {/* Mobile Search */}
               <form onSubmit={handleSearch} className="mb-3">
                 <div className="flex items-center">
-                  <select className="h-11 px-3 bg-muted border border-r-0 border-border rounded-l-md text-xs text-foreground">
-                    <option>All</option>
+                  <select 
+                    className="h-11 px-3 bg-muted border border-r-0 border-border rounded-l-md text-xs text-foreground"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        navigate(`/search?category=${e.target.value}`);
+                        setMobileOpen(false);
+                      }
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="">All</option>
+                    {(Array.isArray(categories) && categories.length > 0) && categories.filter(cat => cat && cat.is_active).slice(0, 10).map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                   </select>
                   <input 
                     type="text" 
@@ -435,8 +506,8 @@ const Navbar = () => {
               {/* Categories */}
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-3 mb-1 mt-2">Categories</p>
               <div className="grid grid-cols-2 gap-1 mb-3">
-                {mainLinks.filter(l => !l.highlight).map((link) => {
-                  const Icon = link.icon ? iconMap[link.icon] : null;
+                {mainLinks.filter(l => !('highlight' in l) || !l.highlight).map((link) => {
+                  const Icon = ('icon' in link && link.icon) ? iconMap[link.icon] : null;
                   return (
                     <Link 
                       key={link.label} 
@@ -453,7 +524,7 @@ const Navbar = () => {
 
               {/* Special Deals */}
               <div className="flex gap-2 mb-3">
-                {mainLinks.filter(l => l.highlight).map((link) => (
+                {mainLinks.filter(l => ('highlight' in l) && l.highlight).map((link) => (
                   <Link 
                     key={link.label} 
                     to={link.url} 
