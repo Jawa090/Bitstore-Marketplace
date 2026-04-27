@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import LocationModal from "@/components/LocationModal";
+import NotificationBell from "@/components/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -243,10 +244,10 @@ const Navbar = () => {
                     {(user.full_name || user.email)[0].toUpperCase()}
                   </div>
                 )}
-                <div className="flex flex-col text-xs text-muted-foreground hover:text-foreground cursor-pointer px-2">
+                <Link to="/profile" className="flex flex-col text-xs text-muted-foreground hover:text-foreground cursor-pointer px-2">
                   <span className="text-[10px]">Hello, {user.full_name || user.email.split('@')[0]}</span>
                   <span className="font-semibold">Account & Lists</span>
-                </div>
+                </Link>
                 <Link to="/vendor">
                   <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-9 w-9" title="Vendor Dashboard">
                     <Store className="h-4 w-4" />
@@ -277,6 +278,11 @@ const Navbar = () => {
             <Button variant="ghost" size="icon" className="hidden sm:flex text-muted-foreground hover:text-foreground h-9 w-9">
               <Heart className="h-4 w-4" />
             </Button>
+
+            {/* Notification Bell (authenticated only) */}
+            <div className="hidden sm:flex">
+              <NotificationBell />
+            </div>
 
             {/* Cart */}
             <Link to="/cart">
@@ -489,6 +495,9 @@ const Navbar = () => {
               <div className="border-t border-border pt-3 space-y-1">
                 {user && (
                   <>
+                    <Link to="/profile" className="flex items-center gap-2.5 text-foreground py-2.5 px-3 rounded-lg hover:bg-muted/60 text-sm w-full text-left" onClick={() => setMobileOpen(false)}>
+                      <Settings className="h-4 w-4 text-muted-foreground" /> My Account
+                    </Link>
                     <Link to="/orders" className="flex items-center gap-2.5 text-foreground py-2.5 px-3 rounded-lg hover:bg-muted/60 text-sm w-full text-left" onClick={() => setMobileOpen(false)}>
                       <Package className="h-4 w-4 text-muted-foreground" /> Your Orders
                     </Link>

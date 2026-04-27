@@ -116,11 +116,65 @@ api.interceptors.response.use(
   }
 );
 
-// ── Named API helpers ───────────────────────────────────────────────
+// ── Auth helpers ────────────────────────────────────────────────────
 export const forgotPassword = (email: string) =>
   api.post("/auth/forgot-password", { email });
 
 export const resetPassword = (token: string, newPassword: string) =>
   api.post("/auth/reset-password", { token, newPassword });
+
+// ── User / Profile helpers ───────────────────────────────────────────
+export const updateUserProfile = (data: any) => api.put("/users/profile", data);
+
+export const uploadProfilePicture = (file: File) => {
+  const form = new FormData();
+  form.append("avatar", file);
+  return api.post("/users/profile-picture", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+export const getAddresses = () => api.get("/users/addresses");
+export const addAddress = (data: any) => api.post("/users/addresses", data);
+export const updateAddress = (id: string, data: any) => api.put(`/users/addresses/${id}`, data);
+export const deleteAddress = (id: string) => api.delete(`/users/addresses/${id}`);
+
+export const getNotifications = () => api.get("/users/notifications");
+export const markNotificationRead = (id: string) => api.put(`/users/notifications/${id}/read`);
+
+// ── Cart helpers ────────────────────────────────────────────────────
+export const fetchCart = () => api.get("/cart");
+export const addCartItem = (productId: string, quantity: number = 1) =>
+  api.post("/cart/items", { productId, quantity });
+export const updateCartItem = (productId: string, quantity: number) =>
+  api.put(`/cart/items/${productId}`, { quantity });
+export const removeCartItem = (productId: string) =>
+  api.delete(`/cart/items/${productId}`);
+export const clearCartApi = () => api.delete("/cart");
+export const syncCartApi = (items: { productId: string; quantity: number }[]) =>
+  api.post("/cart/sync", { items });
+
+// ── Checkout profile guard ──────────────────────────────────────────
+export const validateCheckoutProfile = () => api.get("/users/me");
+
+// ── Order helpers ───────────────────────────────────────────────────
+export const placeOrder = (data: {
+  delivery_address: string;
+  delivery_emirate: string;
+  payment_method: string;
+  phone: string;
+  delivery_landmark?: string;
+  notes?: string;
+}) => api.post("/orders", data);
+
+export const getOrders = () => api.get("/orders");
+export const getOrderById = (id: string) => api.get(`/orders/${id}`);
+export const cancelOrder = (id: string) => api.post(`/orders/${id}/cancel`);
+export const returnOrder = (id: string, data: { reason: string; comments?: string }) =>
+  api.post(`/orders/${id}/return`, data);
+
+// ── Payment helpers ─────────────────────────────────────────────────
+export const createPaymentIntent = (orderId: string) =>
+  api.post("/payments/create-intent", { orderId });
 
 export default api;

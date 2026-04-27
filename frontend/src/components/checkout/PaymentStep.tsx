@@ -11,6 +11,7 @@ interface PaymentStepProps {
   onNext: () => void;
   onBack: () => void;
   codFee: number;
+  isProcessing?: boolean;
 }
 
 const methods: { id: PaymentMethod; label: string; desc: string; icon: typeof CreditCard; badge?: string }[] = [
@@ -20,7 +21,7 @@ const methods: { id: PaymentMethod; label: string; desc: string; icon: typeof Cr
   { id: "bnpl", label: "Buy Now, Pay Later", desc: "Tabby · Tamara — Split in 4 payments", icon: Clock, badge: "Coming Soon" },
 ];
 
-const PaymentStep = ({ selected, onSelect, onNext, onBack, codFee }: PaymentStepProps) => {
+const PaymentStep = ({ selected, onSelect, onNext, onBack, codFee, isProcessing }: PaymentStepProps) => {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-border p-5 sm:p-6 space-y-4 bg-card/50">
@@ -92,11 +93,11 @@ const PaymentStep = ({ selected, onSelect, onNext, onBack, codFee }: PaymentStep
       </div>
 
       <div className="flex gap-3">
-        <Button variant="outline" onClick={onBack} className="flex-1 h-12 gap-2">
+        <Button onClick={onBack} variant="outline" className="flex-1 h-12 gap-2" disabled={isProcessing}>
           <ArrowLeft className="w-4 h-4" /> Back
         </Button>
-        <Button onClick={onNext} className="flex-1 h-12 gap-2 text-base">
-          Place Order <ArrowRight className="w-4 h-4" />
+        <Button onClick={onNext} className="flex-1 h-12 gap-2 text-base" disabled={isProcessing}>
+          {isProcessing ? "Processing…" : "Place Order"} <ArrowRight className="w-4 h-4" />
         </Button>
       </div>
     </div>

@@ -34,6 +34,11 @@ const limiter = rateLimit({
 app.use("/api/", limiter);
 
 // ── Body parsing ────────────────────────────────────────────────────
+// IMPORTANT: express.raw() for the Stripe webhook MUST be registered
+// before express.json() so the raw Buffer is preserved.  Once express.json()
+// runs it consumes the stream and signature verification will fail.
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 

@@ -55,3 +55,36 @@ export enum VendorStatus {
   SUSPENDED = "suspended",
   REJECTED = "rejected",
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// SubOrder Status Enum
+// Mirrors OrderStatus but without 'returned' (handled via ReturnRequest)
+// ─────────────────────────────────────────────────────────────────────
+export enum SubOrderStatus {
+  PENDING = "pending",
+  CONFIRMED = "confirmed",
+  PROCESSING = "processing",
+  SHIPPED = "shipped",
+  DELIVERED = "delivered",
+  CANCELLED = "cancelled",
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Return Request Status Enum
+// ─────────────────────────────────────────────────────────────────────
+export enum ReturnRequestStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  COMPLETED = "completed",
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Payment Status Enum
+// Used by: Order entity, Stripe webhook handler
+// ─────────────────────────────────────────────────────────────────────
+export enum PaymentStatus {
+  UNPAID = "unpaid",
+  PAID = "paid",
+  FAILED = "failed",
+}

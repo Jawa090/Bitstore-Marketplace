@@ -1,14 +1,36 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Store } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Store, AlertCircle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const Cart = () => {
-  const { items, itemsByVendor, updateQuantity, removeItem, totalAmount, totalItems } = useCart();
+  const { items, itemsByVendor, updateQuantity, removeItem, totalAmount, totalItems, cartLoading } = useCart();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
+  // Wipe any stale Stripe session data when the user lands on the cart page.
+  // This handles the case where the user navigated away from the Stripe form
+  // without clicking "Cancel" (e.g. via the logo or browser back button).
+  useEffect(() => {
+    sessionStorage.removeItem("stripeClientSecret");
+    sessionStorage.removeItem("stripeOrderId");
+  }, []);
+
+  // ── Checkout handler — no profile guard, just auth check ──────────
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    navigate("/checkout");
+  };
+
+  // ── Empty cart ────────────────────────────────────────────────────
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-background">
@@ -55,52 +77,74 @@ const Cart = () => {
 
                   {/* Items */}
                   <div className="divide-y divide-border">
-                    {group.items.map((item) => (
-                      <div key={item.productId} className="flex gap-4 p-5">
-                        <Link to={`/product/${item.slug}`} className="shrink-0">
-                          <div className="h-20 w-20 rounded-lg bg-secondary overflow-hidden">
-                            {item.imageUrl && (
-                              <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
-                            )}
-                          </div>
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                          <Link to={`/product/${item.slug}`}>
-                            <h3 className="text-sm font-medium text-foreground truncate hover:text-primary transition-colors">
-                              {item.name}
-                            </h3>
+                    {group.items.map((item) => {
+                      const maxStock = item.stock || 10;
+                      const atStockLimit = item.quantity >= maxStock;
+                      return (
+                        <div key={item.productId} className="flex gap-4 p-5">
+                          <Link to={`/product/${item.slug}`} className="shrink-0">
+                            <div className="h-20 w-20 rounded-lg bg-secondary overflow-hidden">
+                              {item.imageUrl && (
+                                <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                              )}
+                            </div>
                           </Link>
-                          <p className="text-lg font-bold text-foreground mt-1">
-                            {item.currency} {(item.price * item.quantity).toLocaleString()}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <Link to={`/product/${item.slug}`}>
+                              <h3 className="text-sm font-medium text-foreground truncate hover:text-primary transition-colors">
+                                {item.name}
+                              </h3>
+                            </Link>
+                            <p className="text-lg font-bold text-foreground mt-1">
+                              {item.currency} {(item.price * item.quantity).toLocaleString()}
+                            </p>
 
-                          <div className="flex items-center justify-between mt-3">
-                            <div className="flex items-center border border-border rounded-lg">
+                            {/* Stock warning badge */}
+                            {atStockLimit && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                                <span className="text-xs text-amber-500 font-medium">
+                                Max stock reached ({maxStock})
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between mt-3">
+                              {/* Quantity controls */}
+                              <div className="flex items-center border border-border rounded-lg">
+                                <button
+                                  onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                  className="p-1.5 hover:bg-secondary transition-colors rounded-l-lg"
+                                >
+                                  <Minus className="h-3.5 w-3.5" />
+                                </button>
+                                <span className="px-3 text-sm font-medium min-w-[32px] text-center">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                  className={`p-1.5 transition-colors rounded-r-lg ${
+                                    atStockLimit
+                                      ? "opacity-30 cursor-not-allowed"
+                                      : "hover:bg-secondary"
+                                  }`}
+                                  disabled={atStockLimit}
+                                  title={atStockLimit ? `Maximum stock is ${maxStock}` : "Increase quantity"}
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                               <button
-                                onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                                className="p-1.5 hover:bg-secondary transition-colors rounded-l-lg"
+                                onClick={() => removeItem(item.productId)}
+                                className="text-muted-foreground hover:text-destructive transition-colors p-1"
                               >
-                                <Minus className="h-3.5 w-3.5" />
-                              </button>
-                              <span className="px-3 text-sm font-medium min-w-[32px] text-center">{item.quantity}</span>
-                              <button
-                                onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                                className="p-1.5 hover:bg-secondary transition-colors rounded-r-lg"
-                                disabled={item.quantity >= item.stock}
-                              >
-                                <Plus className="h-3.5 w-3.5" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
-                            <button
-                              onClick={() => removeItem(item.productId)}
-                              className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </motion.div>
               ))}
@@ -129,11 +173,17 @@ const Cart = () => {
                 <span>AED {totalAmount.toLocaleString()}</span>
               </div>
 
-              <Link to="/checkout" className="block">
-                <Button className="w-full h-11 glow">
-                  Proceed to Checkout
-                </Button>
-              </Link>
+              <Button
+                className="w-full h-11 glow"
+                onClick={handleCheckout}
+                disabled={cartLoading}
+              >
+                {cartLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Proceed to Checkout"
+                )}
+              </Button>
 
               <Link to="/" className="block">
                 <Button variant="ghost" className="w-full text-muted-foreground">
@@ -144,6 +194,7 @@ const Cart = () => {
           </div>
         </div>
       </div>
+
       <Footer />
     </div>
   );

@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import api from "@/lib/api";
+import { syncCartApi } from "@/lib/api";
+import { getGuestCartForSync, clearGuestCart } from "@/contexts/CartContext";
 
 // ── Types ───────────────────────────────────────────────────────────
 interface AuthUser {
@@ -100,6 +102,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshUser();
   }, [refreshUser]);
 
+  // ── Sync guest cart to backend after auth ──────────────────────
+  const syncGuestCartToBackend = async () => {
+    const guestItems = getGuestCartForSync();
+    if (guestItems.length > 0) {
+      try {
+        await syncCartApi(guestItems);
+        clearGuestCart();
+      } catch {
+        // Silently fail — cart items stay in localStorage
+      }
+    }
+  };
+
   // ── Login ─────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
     const response = await api.post("/auth/login", { email, password });
@@ -108,6 +123,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
     setUser(userData);
+
+    // Sync guest cart silently
+    await syncGuestCartToBackend();
   };
 
   // ── Google Login ──────────────────────────────────────────────
@@ -118,6 +136,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
     setUser(userData);
+
+    // Sync guest cart silently
+    await syncGuestCartToBackend();
   };
 
   // ── Signup ────────────────────────────────────────────────────
