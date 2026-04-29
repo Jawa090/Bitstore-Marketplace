@@ -123,7 +123,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     localStorage.setItem("accessToken", tokens.accessToken);
     localStorage.setItem("refreshToken", tokens.refreshToken);
+    
+    // Set initial user data
     setUser(userData);
+
+    // Fetch complete user data with roles
+    try {
+      const response = await api.get("/users/me");
+      setUser(response.data.data.user);
+    } catch (error) {
+      console.error("Failed to fetch complete user data:", error);
+      // Keep the initial user data if /me fails
+    }
 
     // Sync guest cart silently
     await syncGuestCartToBackend();

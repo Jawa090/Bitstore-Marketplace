@@ -74,6 +74,7 @@ import Dropshipping from "./pages/Dropshipping.tsx";
 import ProfileSettings from "./pages/ProfileSettings.tsx";
 import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import DebugAuth from "./components/DebugAuth.tsx";
 
 const queryClient = new QueryClient();
 
@@ -159,6 +160,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <BitBotWidget />
+            <DebugAuth />
           </BrowserRouter>
         </TooltipProvider>
       </CartProvider>

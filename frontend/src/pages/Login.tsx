@@ -27,40 +27,53 @@ const Login = () => {
     try {
       await login(email, password);
       
+      // Wait for AuthContext to update user state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Fetch fresh user data with roles
       const token = localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
       const response = await fetch('http://localhost:3000/api/users/me', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        const userData = data.data.user;
-        const isAdmin = userData?.roles?.some((role: any) => role.role === 'admin');
-        
-        if (isAdmin) {
-          toast({ 
-            title: "Welcome back, Admin!", 
-            description: "Redirecting to admin dashboard..." 
-          });
-          navigate("/admin");
-        } else {
-          toast({ 
-            title: "Welcome back!", 
-            description: "You have been signed in successfully." 
-          });
-          navigate("/");
-        }
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+
+      const data = await response.json();
+      const userData = data.data.user;
+      
+      console.log('Login - User Data:', userData);
+      console.log('Login - User Roles:', userData?.roles);
+      
+      const isAdmin = userData?.roles?.some((role: any) => role.role === 'admin');
+      console.log('Login - Is Admin:', isAdmin);
+      
+      if (isAdmin) {
+        toast({ 
+          title: "Welcome back, Admin!", 
+          description: "Redirecting to admin dashboard..." 
+        });
+        // Force navigation to admin
+        window.location.href = '/admin';
       } else {
-        // Fallback if /me fails
+        toast({ 
+          title: "Welcome back!", 
+          description: "You have been signed in successfully." 
+        });
         navigate("/");
       }
     } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         title: "Login failed",
-        description: error.displayMessage || "Invalid email or password.",
+        description: error.displayMessage || error.message || "Invalid email or password.",
         variant: "destructive",
       });
     } finally {
