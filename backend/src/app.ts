@@ -18,22 +18,37 @@ const app: Application = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:8080"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:8080", 
+      "http://localhost:8081",
+      "http://localhost:3000"
+    ],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// ── Rate limiter (100 requests per 15 min per IP) ───────────────────
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, error: "Too many requests, please try again later." },
-});
-app.use("/api/", limiter);
+// ── Rate limiter ────────────────────────────────────────────────────
+// Only enable in production
+if (process.env.NODE_ENV === "production") {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: "Too many requests, please try again later." },
+  });
+  app.use("/api/", limiter);
+}
 
 // ── Body parsing ────────────────────────────────────────────────────
+// IMPORTANT: express.raw() for the Stripe webhook MUST be registered
+// before express.json() so the raw Buffer is preserved.  Once express.json()
+// runs it consumes the stream and signature verification will fail.
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 

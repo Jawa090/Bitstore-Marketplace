@@ -118,3 +118,78 @@ export const getProductBySlug = async (slug: string): Promise<Product | null> =>
     .andWhere("product.is_active = :isActive", { isActive: true })
     .getOne();
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// GET RELATED PRODUCTS (same brand or category)
+// ─────────────────────────────────────────────────────────────────────
+export const getRelatedProducts = async (slug: string, limit: number = 8): Promise<Product[]> => {
+  // First, get the current product
+  const currentProduct = await productRepo()
+    .createQueryBuilder("product")
+    .where("product.slug = :slug", { slug })
+    .andWhere("product.is_active = :isActive", { isActive: true })
+    .getOne();
+
+  if (!currentProduct) {
+    return [];
+  }
+
+  // Find related products (same brand or category, excluding current product)
+  const relatedProducts = await productRepo()
+    .createQueryBuilder("product")
+    .leftJoinAndSelect("product.vendor", "vendor")
+    .leftJoinAndSelect("product.category", "category")
+    .leftJoinAndSelect("product.brand", "brand")
+    .leftJoinAndSelect("product.images", "images")
+    .where("product.id != :currentId", { currentId: currentProduct.id })
+    .andWhere("product.is_active = :isActive", { isActive: true })
+    .andWhere(
+      "(product.brand_id = :brandId OR product.category_id = :categoryId)",
+      { brandId: currentProduct.brand_id, categoryId: currentProduct.category_id }
+    )
+    .orderBy("RANDOM()")
+    .take(limit)
+    .getMany();
+
+  return relatedProducts;
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// GET PRODUCT VARIANTS (same model, different storage/color)
+// ─────────────────────────────────────────────────────────────────────
+export const getProductVariants = async (slug: string): Promise<Product[]> => {
+  // First, get the current product
+  const currentProduct = await productRepo()
+    .createQueryBuilder("product")
+    .leftJoinAndSelect("product.brand", "brand")
+    .where("product.slug = :slug", { slug })
+    .andWhere("product.is_active = :isActive", { isActive: true })
+    .getOne();
+
+  if (!currentProduct) {
+    return [];
+  }
+
+  // Extract base model name (remove storage/color info)
+  // Example: "iPhone 15 Pro 256GB Blue" -> "iPhone 15 Pro"
+  const baseModelName = currentProduct.name
+    .replace(/\d+(GB|TB)/gi, '') // Remove storage
+    .replace(/(Black|White|Blue|Red|Green|Gold|Silver|Purple|Pink|Gray|Grey)/gi, '') // Remove colors
+    .trim();
+
+  // Find variants (same brand, similar name, different storage/color)
+  const variants = await productRepo()
+    .createQueryBuilder("product")
+    .leftJoinAndSelect("product.vendor", "vendor")
+    .leftJoinAndSelect("product.category", "category")
+    .leftJoinAndSelect("product.brand", "brand")
+    .leftJoinAndSelect("product.images", "images")
+    .where("product.id != :currentId", { currentId: currentProduct.id })
+    .andWhere("product.is_active = :isActive", { isActive: true })
+    .andWhere("product.brand_id = :brandId", { brandId: currentProduct.brand_id })
+    .andWhere("product.name ILIKE :baseName", { baseName: `%${baseModelName}%` })
+    .orderBy("product.price", "ASC")
+    .getMany();
+
+  return variants;
+};

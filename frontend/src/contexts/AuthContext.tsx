@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { authService } from "@/services/api/auth.service";
 import api from "@/lib/api";
+import { syncCartApi } from "@/lib/api";
+import { getGuestCartForSync, clearGuestCart } from "@/contexts/CartContext";
 
 // ── Types ───────────────────────────────────────────────────────────
 interface AuthUser {
@@ -13,6 +15,7 @@ interface AuthUser {
   is_active: boolean;
   email_verified: boolean;
   created_at: string;
+  roles?: Array<{ role: string }>;
 }
 
 interface AuthContextType {
@@ -101,6 +104,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     refreshUser();
   }, [refreshUser]);
 
+  // ── Sync guest cart to backend after auth ──────────────────────
+  const syncGuestCartToBackend = async () => {
+    const guestItems = getGuestCartForSync();
+    if (guestItems.length > 0) {
+      try {
+        await syncCartApi(guestItems);
+        clearGuestCart();
+      } catch {
+        // Silently fail — cart items stay in localStorage
+      }
+    }
+  };
+
   // ── Login ─────────────────────────────────────────────────────
   const login = async (email: string, password: string) => {
     const { user: userData, tokens } = await authService.login({ email, password });
@@ -108,6 +124,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("accessToken", tokens.accessToken);
     localStorage.setItem("refreshToken", tokens.refreshToken);
     setUser(userData);
+
+    // Sync guest cart silently
+    await syncGuestCartToBackend();
   };
 
   // ── Google Login ──────────────────────────────────────────────
@@ -117,6 +136,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("accessToken", tokens.accessToken);
     localStorage.setItem("refreshToken", tokens.refreshToken);
     setUser(userData);
+
+    // Sync guest cart silently
+    await syncGuestCartToBackend();
   };
 
   // ── Signup ────────────────────────────────────────────────────

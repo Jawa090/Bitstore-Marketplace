@@ -2,6 +2,7 @@ import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { AppDataSource } from "../config/database";
 import { User } from "../entities/User";
+import { UserRoleEntity } from "../entities/UserRole";
 import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../types/auth.types";
 import redisClient from "../config/redis";
@@ -58,9 +59,13 @@ export const protect = async (
       throw new AppError("Your account has been deactivated. Contact support.", 403);
     }
 
-    // 5. Strip password_hash before attaching to req
+    // 5. Fetch user roles
+    const roleRepo = AppDataSource.getRepository(UserRoleEntity);
+    const userRoles = await roleRepo.find({ where: { user_id: user.id } });
+
+    // 6. Strip password_hash before attaching to req
     const { password_hash, ...safeUser } = user;
-    req.user = safeUser;
+    req.user = { ...safeUser, roles: userRoles };
 
     next();
   } catch (error) {
@@ -73,11 +78,43 @@ export const protect = async (
 // Usage: router.get('/admin-only', protect, requireRole('admin'), handler)
 // ─────────────────────────────────────────────────────────────────────
 export const requireRole = (...roles: string[]) => {
-  return (req: AuthRequest, _res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      return next(new AppError("Not authenticated.", 401));
+  return async (req: AuthRequest, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new AppError("Not authenticated.", 401);
+      }
+
+      // Fetch user roles from database
+      const userRoleRepo = AppDataSource.getRepository("UserRoleEntity");
+      const userRoles = await userRoleRepo.find({
+        where: { user_id: req.user.id },
+      });
+
+      // Extract role names
+      const userRoleNames = userRoles.map((ur: any) => ur.role);
+
+      // Check if user has any of the required roles
+      const hasRole = roles.some((role) => userRoleNames.includes(role));
+
+      if (!hasRole) {
+        throw new AppError(
+          `Access denied. Required role(s): ${roles.join(", ")}`,
+          403
+        );
+      }
+
+      // Attach roles to request for later use
+      req.userRoles = userRoleNames;
+
+      next();
+    } catch (error) {
+      next(error);
     }
-    // Role check will be implemented when UserRole entity query is added
-    next();
   };
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// isAdmin — shorthand for requireRole('admin')
+// Usage: router.get('/admin-only', protect, isAdmin, handler)
+// ─────────────────────────────────────────────────────────────────────
+export const isAdmin = requireRole("admin");

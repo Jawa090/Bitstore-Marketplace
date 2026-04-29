@@ -11,6 +11,7 @@ import {
 import { Emirate } from "../utils/constants";
 import { Profile } from "./Profile";
 import { Address } from "./Address";
+import { UserRoleEntity } from "./UserRole";
 
 @Entity("users")
 export class User {
@@ -63,6 +64,9 @@ export class User {
 
   @OneToMany(() => Address, (address) => address.user)
   addresses: Address[];
+
+  @OneToMany(() => UserRoleEntity, (role) => role.user)
+  roles: UserRoleEntity[];
 
   // ── Timestamps ──────────────────────────────────────────────────
   @CreateDateColumn({ type: "timestamptz" })

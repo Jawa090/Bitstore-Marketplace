@@ -9,6 +9,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Search, Store, ShoppingBag, Package, Users } from "lucide-react";
+import * as adminService from "../../services/api/admin.service";
 
 interface SearchResult {
   id: string;
@@ -38,44 +39,45 @@ export function AdminGlobalSearch() {
   const search = useCallback(async (q: string) => {
     if (q.length < 2) { setResults([]); return; }
 
-    const [vendors, orders, products, users] = await Promise.all([
-      supabase.from("vendors").select("id, store_name, emirate, status").ilike("store_name", `%${q}%`).limit(5),
-      supabase.from("orders").select("id, total_amount, delivery_emirate, status").or(`id.ilike.%${q}%,delivery_emirate.ilike.%${q}%`).limit(5),
-      supabase.from("products").select("id, name, brand, slug").ilike("name", `%${q}%`).limit(5),
-      supabase.from("profiles").select("user_id, display_name, email").or(`display_name.ilike.%${q}%,email.ilike.%${q}%`).limit(5),
-    ]);
+    try {
+      const response = await adminService.globalSearch(q);
+      const data = response.data;
 
-    const res: SearchResult[] = [
-      ...(vendors.data || []).map((v) => ({
-        id: v.id,
-        label: v.store_name,
-        sub: `${v.emirate} · ${v.status}`,
-        type: "vendor" as const,
-        url: "/admin/vendors",
-      })),
-      ...(orders.data || []).map((o) => ({
-        id: o.id,
-        label: `Order #${o.id.slice(0, 8)}`,
-        sub: `AED ${Number(o.total_amount).toLocaleString()} · ${o.delivery_emirate}`,
-        type: "order" as const,
-        url: "/admin/orders",
-      })),
-      ...(products.data || []).map((p) => ({
-        id: p.id,
-        label: p.name,
-        sub: p.brand,
-        type: "product" as const,
-        url: "/admin/products",
-      })),
-      ...(users.data || []).map((u) => ({
-        id: u.user_id,
-        label: u.display_name || u.email || "Unknown",
-        sub: u.email || "",
-        type: "user" as const,
-        url: "/admin/users",
-      })),
-    ];
-    setResults(res);
+      const res: SearchResult[] = [
+        ...(data.vendors || []).map((v: { id: string; store_name: string; emirate?: string; verification_status?: string }) => ({
+          id: v.id,
+          label: v.store_name,
+          sub: `${v.emirate || "N/A"} · ${v.verification_status || "pending"}`,
+          type: "vendor" as const,
+          url: "/admin/vendors",
+        })),
+        ...(data.orders || []).map((o: { id: string; total_amount: number; delivery_emirate: string; status: string }) => ({
+          id: o.id,
+          label: `Order #${o.id.slice(0, 8)}`,
+          sub: `AED ${Number(o.total_amount).toLocaleString()} · ${o.delivery_emirate}`,
+          type: "order" as const,
+          url: "/admin/orders",
+        })),
+        ...(data.products || []).map((p: { id: string; name: string; slug: string; brand?: { name: string } }) => ({
+          id: p.id,
+          label: p.name,
+          sub: p.brand?.name || "No brand",
+          type: "product" as const,
+          url: "/admin/products",
+        })),
+        ...(data.users || []).map((u: { id: string; full_name?: string; email?: string }) => ({
+          id: u.id,
+          label: u.full_name || u.email || "Unknown",
+          sub: u.email || "",
+          type: "user" as const,
+          url: "/admin/users",
+        })),
+      ];
+      setResults(res);
+    } catch (error) {
+      console.error("Search failed:", error);
+      setResults([]);
+    }
   }, []);
 
   useEffect(() => {

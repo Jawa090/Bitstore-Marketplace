@@ -11,4 +11,5 @@ import { User } from '../entities/User';
  */
 export interface AuthRequest extends Request {
   user?: Omit<User, 'password_hash'>;
+  userRoles?: string[]; // Array of user roles (e.g., ['customer', 'admin'])
 }

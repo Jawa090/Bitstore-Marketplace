@@ -27,8 +27,8 @@ import VendorSettings from "./pages/vendor/VendorSettings.tsx";
 import VendorApply from "./pages/vendor/VendorApply.tsx";
 import VendorPayouts from "./pages/vendor/VendorPayouts.tsx";
 import LanguageSettings from "./pages/LanguageSettings.tsx";
-import AdminLayout from "./pages/admin/AdminLayout.tsx";
-import AdminOverview from "./pages/admin/AdminOverview.tsx";
+import AdminLayout from "./layouts/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminVendors from "./pages/admin/AdminVendors.tsx";
 import AdminUsers from "./pages/admin/AdminUsers.tsx";
 import AdminOrders from "./pages/admin/AdminOrders.tsx";
@@ -71,6 +71,8 @@ import ContactUs from "./pages/ContactUs.tsx";
 import TradeIn from "./pages/TradeIn.tsx";
 import Accessories from "./pages/Accessories.tsx";
 import Dropshipping from "./pages/Dropshipping.tsx";
+import ProfileSettings from "./pages/ProfileSettings.tsx";
+import ProtectedRoute from "./components/ProtectedRoute.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -94,9 +96,9 @@ const App = () => (
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/cart" element={<Cart />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
+              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+              <Route path="/order-confirmation/:id" element={<ProtectedRoute><OrderConfirmation /></ProtectedRoute>} />
               <Route path="/wholesale" element={<Wholesale />} />
               <Route path="/auctions" element={<Auctions />} />
               <Route path="/shipping" element={<ShippingGuide />} />
@@ -107,6 +109,7 @@ const App = () => (
               <Route path="/accessories" element={<Accessories />} />
               <Route path="/dropshipping" element={<Dropshipping />} />
               <Route path="/settings/language" element={<LanguageSettings />} />
+              <Route path="/profile" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
               <Route path="/vendor/apply" element={<VendorApply />} />
               <Route path="/vendor" element={<VendorLayout />}>
                 <Route index element={<VendorOverview />} />
@@ -121,7 +124,7 @@ const App = () => (
                 <Route path="auctions" element={<VendorAuctions />} />
               </Route>
               <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<AdminOverview />} />
+                <Route index element={<AdminDashboard />} />
                 <Route path="vendors" element={<AdminVendors />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="users" element={<AdminUsers />} />

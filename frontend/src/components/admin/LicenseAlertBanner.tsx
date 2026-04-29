@@ -6,12 +6,14 @@ const LicenseAlertBanner = () => {
   const { data } = useQuery({
     queryKey: ["license-alerts"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("vendor_trade_licenses")
-        .select("id, expiry_date, license_number, vendor_id, vendors(store_name)")
-        .in("status", ["active", "expiring_soon"]);
-      if (error) throw error;
-      return data || [];
+      // TODO: Implement backend API for trade licenses
+      // For now, return empty array
+      // Future: Call /api/v1/admin/trade-licenses?status=expiring
+      return [];
+      
+      // Future implementation:
+      // const response = await api.get('/api/v1/admin/trade-licenses?status=expiring');
+      // return response.data.licenses;
     },
     refetchInterval: 5 * 60 * 1000, // refresh every 5 min
   });

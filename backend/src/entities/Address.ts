@@ -6,52 +6,44 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { User } from "./User";
-import { Emirate } from "../utils/constants";
 
 @Entity("addresses")
 export class Address {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
+  // ── Foreign Key ─────────────────────────────────────────────────
+  @Index()
   @Column({ type: "uuid" })
   user_id: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user: User;
 
+  // ── Fields ──────────────────────────────────────────────────────
   @Column({ type: "varchar", length: 100 })
-  type: string; // 'home', 'work', 'other'
+  label: string; // e.g. "Home", "Work", "Office"
 
-  @Column({ type: "varchar", length: 255 })
-  full_name: string;
-
-  @Column({ type: "varchar", length: 20 })
-  phone: string;
+  @Column({ type: "varchar", length: 100 })
+  emirate: string;
 
   @Column({ type: "text" })
-  address_line_1: string;
+  address: string;
 
   @Column({ type: "text", nullable: true })
-  address_line_2: string | null;
+  landmark: string | null;
 
-  @Column({ type: "varchar", length: 100 })
-  city: string;
-
-  @Column({
-    type: "enum",
-    enum: Emirate,
-  })
-  emirate: Emirate;
-
-  @Column({ type: "varchar", length: 10, nullable: true })
-  postal_code: string | null;
+  @Column({ type: "varchar", length: 20, nullable: true })
+  phone: string | null;
 
   @Column({ type: "boolean", default: false })
   is_default: boolean;
 
+  // ── Timestamps ──────────────────────────────────────────────────
   @CreateDateColumn({ type: "timestamptz" })
   created_at: Date;
 

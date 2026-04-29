@@ -1,4 +1,4 @@
-import api from '../../lib/api';
+import api from './index';
 
 export interface LoginData {
   email: string;
@@ -33,20 +33,42 @@ export interface AuthResponse {
 export const authService = {
   // Login user
   login: async (data: LoginData): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login', data);
-    return response.data.data;
+    try {
+      console.log('🔐 Attempting login to:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/login`);
+      const response = await api.post('/auth/login', data);
+      console.log('✅ Login successful:', response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('❌ Login error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Register user
   register: async (data: RegisterData): Promise<AuthResponse> => {
-    const response = await api.post('/auth/register', data);
-    return response.data.data;
+    try {
+      console.log('📝 Attempting registration to:', `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/auth/register`);
+      console.log('📝 Registration data:', { ...data, password: '***' });
+      const response = await api.post('/auth/register', data);
+      console.log('✅ Registration successful:', response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('❌ Registration error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Google OAuth
   googleAuth: async (credential: string): Promise<AuthResponse> => {
-    const response = await api.post('/auth/google', { credential });
-    return response.data.data;
+    try {
+      console.log('🔐 Attempting Google OAuth');
+      const response = await api.post('/auth/google', { credential });
+      console.log('✅ Google OAuth successful');
+      return response.data.data;
+    } catch (error: any) {
+      console.error('❌ Google OAuth error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   // Logout

@@ -79,6 +79,9 @@ export class Product {
   @Column({ type: "boolean", default: true })
   is_active: boolean;
 
+  @Column({ type: "boolean", default: false })
+  is_featured: boolean;
+
   // Phone Specifications
   @Column({ type: "varchar", length: 50, nullable: true })
   ram: string | null;

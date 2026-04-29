@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import api from "../../services/api/index";
 
 interface ImageUploadProps {
   value: string;
@@ -32,23 +33,21 @@ const ImageUpload = ({ value, onChange, folder = "hero", placeholder = "Image UR
 
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', folder);
 
-      const { error } = await supabase.storage
-        .from("storefront-assets")
-        .upload(path, file, { cacheControl: "3600", upsert: false });
+      const response = await api.post('/api/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from("storefront-assets")
-        .getPublicUrl(path);
-
-      onChange(urlData.publicUrl);
+      onChange(response.data.data.url);
       toast.success("Image uploaded!");
     } catch (err: any) {
-      toast.error(err.message || "Upload failed");
+      console.error("Upload error:", err);
+      toast.error(err.response?.data?.message || "Upload failed");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

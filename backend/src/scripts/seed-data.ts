@@ -4,6 +4,7 @@ import { Category } from "../entities/Category";
 import { Vendor, VendorStatus } from "../entities/Vendor";
 import { Product } from "../entities/Product";
 import { ProductImage } from "../entities/ProductImage";
+import { Collection } from "../entities/Collection";
 import { User } from "../entities/User";
 import { UserRoleEntity } from "../entities/UserRole";
 import { Emirate, UserRole, ProductCondition } from "../utils/constants";
@@ -34,6 +35,35 @@ export const seedSampleData = async () => {
         role: UserRole.VENDOR
       });
       await userRoleRepo.save(vendorRole);
+    }
+
+    // Create admin user
+    let adminUser = await userRepo.findOne({ where: { email: "admin@bitstores.com" } });
+    if (!adminUser) {
+      const { hashPassword } = await import("../utils/password");
+      const hashedPassword = await hashPassword("Admin123456");
+      
+      adminUser = userRepo.create({
+        email: "admin@bitstores.com",
+        password_hash: hashedPassword,
+        full_name: "BitStores Admin",
+        phone: "+971501234568",
+        emirate: Emirate.DUBAI,
+        is_active: true,
+        email_verified: true
+      });
+      await userRepo.save(adminUser);
+
+      // Add admin role
+      const adminRole = userRoleRepo.create({
+        user_id: adminUser.id,
+        role: UserRole.ADMIN
+      });
+      await userRoleRepo.save(adminRole);
+
+      console.log("✅ Admin user created:");
+      console.log("   Email: admin@bitstores.com");
+      console.log("   Password: Admin123456");
     }
 
     // Create brands
@@ -333,8 +363,82 @@ export const seedSampleData = async () => {
       }
     }
 
+    // Create collections
+    const collectionRepo = AppDataSource.getRepository(Collection);
+    
+    const collections = [
+      {
+        name: "Best Sellers",
+        slug: "best-sellers",
+        description: "Our most popular products loved by customers",
+        banner_url: "https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&h=400&fit=crop",
+        display_order: 1
+      },
+      {
+        name: "New Arrivals",
+        slug: "new-arrivals",
+        description: "Latest products just added to our store",
+        banner_url: "https://images.unsplash.com/photo-1556656793-08538906a9f8?w=1200&h=400&fit=crop",
+        display_order: 2
+      },
+      {
+        name: "Summer Sale",
+        slug: "summer-sale",
+        description: "Hot deals for the summer season",
+        banner_url: "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=1200&h=400&fit=crop",
+        display_order: 3
+      },
+      {
+        name: "Premium Picks",
+        slug: "premium-picks",
+        description: "Handpicked premium products for tech enthusiasts",
+        banner_url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1200&h=400&fit=crop",
+        display_order: 4
+      }
+    ];
+
+    const savedCollections = [];
+    for (const collectionData of collections) {
+      let collection = await collectionRepo.findOne({ where: { slug: collectionData.slug } });
+      if (!collection) {
+        collection = collectionRepo.create(collectionData);
+        await collectionRepo.save(collection);
+      }
+      savedCollections.push(collection);
+    }
+
+    // Add products to collections
+    // Get all products
+    const allProducts = await productRepo.find({ take: 5 });
+    
+    if (allProducts.length > 0 && savedCollections.length > 0) {
+      // Best Sellers - Add first 3 products
+      if (savedCollections[0] && allProducts.length >= 3) {
+        savedCollections[0].products = [allProducts[0], allProducts[1], allProducts[2]];
+        await collectionRepo.save(savedCollections[0]);
+      }
+
+      // New Arrivals - Add last 3 products
+      if (savedCollections[1] && allProducts.length >= 3) {
+        savedCollections[1].products = [allProducts[2], allProducts[3], allProducts[4]];
+        await collectionRepo.save(savedCollections[1]);
+      }
+
+      // Summer Sale - Add products with discounts
+      if (savedCollections[2] && allProducts.length >= 2) {
+        savedCollections[2].products = [allProducts[0], allProducts[1]];
+        await collectionRepo.save(savedCollections[2]);
+      }
+
+      // Premium Picks - Add Apple products
+      if (savedCollections[3] && allProducts.length >= 3) {
+        savedCollections[3].products = [allProducts[0], allProducts[3], allProducts[4]];
+        await collectionRepo.save(savedCollections[3]);
+      }
+    }
+
     console.log("✅ Sample data seeded successfully!");
-    console.log(`📊 Created: ${savedBrands.length} brands, ${savedCategories.length} categories, ${products.length} products`);
+    console.log(`📊 Created: ${savedBrands.length} brands, ${savedCategories.length} categories, ${products.length} products, ${savedCollections.length} collections`);
     
   } catch (error) {
     console.error("❌ Error seeding data:", error);

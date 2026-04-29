@@ -78,3 +78,54 @@ export const getProductBySlug = async (req: Request, res: Response, next: NextFu
     next(error);
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────
+// GET /api/v1/products/slug/:slug/related
+// Get related products (same brand or category)
+// ─────────────────────────────────────────────────────────────────────
+export const getRelatedProducts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    if (typeof slug !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product slug",
+      });
+    }
+    const limit = parseInt(req.query.limit as string) || 8;
+
+    const products = await productService.getRelatedProducts(slug, limit);
+
+    res.json({
+      success: true,
+      data: { products },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────
+// GET /api/v1/products/slug/:slug/variants
+// Get product variants (same model, different storage/color)
+// ─────────────────────────────────────────────────────────────────────
+export const getProductVariants = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { slug } = req.params;
+    if (typeof slug !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product slug",
+      });
+    }
+
+    const variants = await productService.getProductVariants(slug);
+
+    res.json({
+      success: true,
+      data: { variants },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -18,8 +18,10 @@ export const register = async (
 
     sendCreated(res, "User registered successfully", {
       user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
+      tokens: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      }
     });
   } catch (error) {
     next(error);
@@ -35,15 +37,18 @@ export const googleAuth = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const { idToken } = req.body;
-    if (!idToken) {
-      throw new AppError("idToken is required", 400);
+    const { idToken, credential } = req.body;
+    const token = idToken || credential; // Support both field names
+    if (!token) {
+      throw new AppError("idToken or credential is required", 400);
     }
-    const result = await AuthService.googleLogin(idToken);
+    const result = await AuthService.googleLogin(token);
     sendSuccess(res, "Google sign-in successful", {
       user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
+      tokens: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      }
     });
   } catch (error) {
     next(error);
@@ -64,8 +69,10 @@ export const login = async (
 
     sendSuccess(res, "Login successful", {
       user: result.user,
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
+      tokens: {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      }
     });
   } catch (error) {
     next(error);

@@ -17,19 +17,19 @@ export interface Category {
 export const categoryService = {
   // Get all categories
   getCategories: async (): Promise<Category[]> => {
-    const response = await api.get('/categories');
+    const response = await api.get('/v1/categories');
     return response.data.data.categories; // Extract categories from nested structure
   },
 
   // Get category by ID
   getCategoryById: async (id: string): Promise<Category> => {
-    const response = await api.get(`/categories/${id}`);
+    const response = await api.get(`/v1/categories/${id}`);
     return response.data.data.category;
   },
 
   // Get category by slug
   getCategoryBySlug: async (slug: string): Promise<Category> => {
-    const response = await api.get(`/categories/slug/${slug}`);
+    const response = await api.get(`/v1/categories/slug/${slug}`);
     return response.data.data.category;
   }
 };

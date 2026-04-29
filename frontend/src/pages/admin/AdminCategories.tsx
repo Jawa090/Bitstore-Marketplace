@@ -1,463 +1,444 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
-import {
-  GripVertical,
-  Plus,
-  Trash2,
-  Package,
-  Search,
-  X,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  Tag,
-  Edit2,
-  Check,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Edit, Trash2, AlertCircle, Save, X, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import * as adminService from "../../services/api/admin.service";
+import * as categoryService from "../../services/api/category.service";
 
-interface Collection {
+interface Category {
   id: string;
   name: string;
   slug: string;
   description: string | null;
+  icon_url: string | null;
+  parent_id: string | null;
   display_order: number;
   is_active: boolean;
-  badge_text: string | null;
+  created_at: string;
 }
 
-interface CollectionProduct {
-  id: string;
-  collection_id: string;
-  product_id: string;
-  display_order: number;
-}
-
-interface Product {
-  id: string;
+interface CategoryFormData {
   name: string;
-  brand: string;
-  price: number;
-  currency: string;
   slug: string;
+  description: string;
+  icon_url: string;
+  parent_id: string;
+  display_order: number;
+  is_active: boolean;
 }
 
 const AdminCategories = () => {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [productSearch, setProductSearch] = useState("");
-  const [newName, setNewName] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editBadge, setEditBadge] = useState("");
-  const [draggedCollection, setDraggedCollection] = useState<string | null>(null);
-  const [dragOverCollection, setDragOverCollection] = useState<string | null>(null);
-  const [draggedProduct, setDraggedProduct] = useState<{ collectionId: string; productId: string } | null>(null);
-  const [dragOverProduct, setDragOverProduct] = useState<string | null>(null);
-
-  const { data: collections = [] } = useQuery({
-    queryKey: ["admin-collections"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("collections")
-        .select("*")
-        .order("display_order");
-      if (error) throw error;
-      return data as Collection[];
-    },
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [formData, setFormData] = useState<CategoryFormData>({
+    name: "",
+    slug: "",
+    description: "",
+    icon_url: "",
+    parent_id: "",
+    display_order: 0,
+    is_active: true,
   });
 
-  const { data: collectionProducts = [] } = useQuery({
-    queryKey: ["admin-collection-products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("collection_products")
-        .select("*")
-        .order("display_order");
-      if (error) throw error;
-      return data as CollectionProduct[];
-    },
-  });
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
-  const { data: allProducts = [] } = useQuery({
-    queryKey: ["admin-products-for-collections"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, brand, price, currency, slug")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data as Product[];
-    },
-  });
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["admin-collections"] });
-    qc.invalidateQueries({ queryKey: ["admin-collection-products"] });
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await categoryService.categoryService.getCategories();
+      setCategories(response);
+    } catch (err: any) {
+      console.error("Failed to fetch categories:", err);
+      setError(err.response?.data?.message || "Failed to load categories");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const createCollection = useMutation({
-    mutationFn: async (name: string) => {
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      const maxOrder = Math.max(0, ...collections.map((c) => c.display_order));
-      const { error } = await supabase.from("collections").insert({
-        name,
-        slug,
-        display_order: maxOrder + 1,
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  };
+
+  const handleNameChange = (name: string) => {
+    setFormData({
+      ...formData,
+      name,
+      slug: generateSlug(name),
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      slug: "",
+      description: "",
+      icon_url: "",
+      parent_id: "",
+      display_order: 0,
+      is_active: true,
+    });
+    setEditingCategory(null);
+  };
+
+  const handleCreateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const response = await adminService.createCategory({
+        name: formData.name.trim(),
+        slug: formData.slug.trim(),
+        description: formData.description.trim() || undefined,
+        icon_url: formData.icon_url.trim() || undefined,
+        parent_id: formData.parent_id || undefined,
+        display_order: formData.display_order,
       });
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidate(); setNewName(""); toast({ title: "Collection created" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
+      
+      await fetchCategories();
+      setShowCreateModal(false);
+      resetForm();
+      toast.success("Category created successfully");
+    } catch (err: any) {
+      console.error("Failed to create category:", err);
+      toast.error(err.response?.data?.message || "Failed to create category");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-  const updateCollection = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Collection> }) => {
-      const { error } = await supabase.from("collections").update(updates).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidate(); setEditingId(null); toast({ title: "Updated" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory || !formData.name.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
 
-  const deleteCollection = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("collections").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidate(); toast({ title: "Collection deleted" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const addProduct = useMutation({
-    mutationFn: async ({ collectionId, productId }: { collectionId: string; productId: string }) => {
-      const existing = collectionProducts.filter((cp) => cp.collection_id === collectionId);
-      const maxOrder = Math.max(0, ...existing.map((cp) => cp.display_order));
-      const { error } = await supabase.from("collection_products").insert({
-        collection_id: collectionId,
-        product_id: productId,
-        display_order: maxOrder + 1,
+    try {
+      setActionLoading(true);
+      const response = await adminService.updateCategory(editingCategory.id, {
+        name: formData.name.trim(),
+        slug: formData.slug.trim(),
+        description: formData.description.trim() || undefined,
+        icon_url: formData.icon_url.trim() || undefined,
+        parent_id: formData.parent_id || undefined,
+        display_order: formData.display_order,
+        is_active: formData.is_active,
       });
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidate(); toast({ title: "Product added" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
+      
+      await fetchCategories();
+      setEditingCategory(null);
+      resetForm();
+      toast.success("Category updated successfully");
+    } catch (err: any) {
+      console.error("Failed to update category:", err);
+      toast.error(err.response?.data?.message || "Failed to update category");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-  const removeProduct = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("collection_products").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { invalidate(); toast({ title: "Product removed" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setFormData({
+      name: category.name,
+      slug: category.slug,
+      description: category.description || "",
+      icon_url: category.icon_url || "",
+      parent_id: category.parent_id || "",
+      display_order: category.display_order,
+      is_active: category.is_active,
+    });
+  };
 
-  const reorderCollections = async (dragId: string, dropId: string) => {
-    if (dragId === dropId) return;
-    const sorted = [...collections].sort((a, b) => a.display_order - b.display_order);
-    const dragIdx = sorted.findIndex((c) => c.id === dragId);
-    const dropIdx = sorted.findIndex((c) => c.id === dropId);
-    if (dragIdx === -1 || dropIdx === -1) return;
-    const [moved] = sorted.splice(dragIdx, 1);
-    sorted.splice(dropIdx, 0, moved);
-    await Promise.all(
-      sorted.map((c, i) =>
-        supabase.from("collections").update({ display_order: i }).eq("id", c.id)
+  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${categoryName}"? This will fail if products are linked to this category.`
       )
-    );
-    invalidate();
+    ) {
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const response = await adminService.deleteCategory(categoryId);
+      await fetchCategories();
+      toast.success(response.message || "Category deleted successfully");
+    } catch (err: any) {
+      console.error("Failed to delete category:", err);
+      toast.error(err.response?.data?.message || "Failed to delete category");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const reorderProducts = async (collectionId: string, dragProductId: string, dropProductId: string) => {
-    if (dragProductId === dropProductId) return;
-    const items = collectionProducts
-      .filter((cp) => cp.collection_id === collectionId)
-      .sort((a, b) => a.display_order - b.display_order);
-    const dragIdx = items.findIndex((cp) => cp.product_id === dragProductId);
-    const dropIdx = items.findIndex((cp) => cp.product_id === dropProductId);
-    if (dragIdx === -1 || dropIdx === -1) return;
-    const [moved] = items.splice(dragIdx, 1);
-    items.splice(dropIdx, 0, moved);
-    await Promise.all(
-      items.map((cp, i) =>
-        supabase.from("collection_products").update({ display_order: i }).eq("id", cp.id)
-      )
-    );
-    invalidate();
-  };
+  const CategoryForm = ({ isEdit = false }: { isEdit?: boolean }) => (
+    <form onSubmit={isEdit ? handleUpdateCategory : handleCreateCategory} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Category Name *
+        </label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          placeholder="Enter category name"
+          required
+        />
+      </div>
 
-  const getCollectionProducts = (collectionId: string) => {
-    const cpIds = collectionProducts
-      .filter((cp) => cp.collection_id === collectionId)
-      .sort((a, b) => a.display_order - b.display_order);
-    return cpIds
-      .map((cp) => {
-        const product = allProducts.find((p) => p.id === cp.product_id);
-        return product ? { ...product, cpId: cp.id } : null;
-      })
-      .filter(Boolean) as (Product & { cpId: string })[];
-  };
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Slug *
+        </label>
+        <input
+          type="text"
+          value={formData.slug}
+          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          placeholder="category-slug"
+          required
+        />
+      </div>
 
-  const getAvailableProducts = (collectionId: string) => {
-    const assignedIds = new Set(
-      collectionProducts.filter((cp) => cp.collection_id === collectionId).map((cp) => cp.product_id)
-    );
-    return allProducts.filter(
-      (p) => !assignedIds.has(p.id) && (!productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()))
-    );
-  };
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Description
+        </label>
+        <textarea
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          placeholder="Category description"
+          rows={3}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Icon URL
+        </label>
+        <input
+          type="url"
+          value={formData.icon_url}
+          onChange={(e) => setFormData({ ...formData, icon_url: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+          placeholder="https://example.com/icon.png"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Display Order
+          </label>
+          <input
+            type="number"
+            value={formData.display_order}
+            onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            min="0"
+          />
+        </div>
+
+        {isEdit && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Status
+            </label>
+            <select
+              value={formData.is_active.toString()}
+              onChange={(e) => setFormData({ ...formData, is_active: e.target.value === "true" })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <button
+          type="submit"
+          disabled={actionLoading}
+          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {actionLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {isEdit ? "Update Category" : "Create Category"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (isEdit) {
+              setEditingCategory(null);
+            } else {
+              setShowCreateModal(false);
+            }
+            resetForm();
+          }}
+          className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+        >
+          <X className="w-4 h-4" />
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Category Manager</h1>
-        <p className="text-sm text-muted-foreground">
-          Drag to reorder collections and products. Manage Flash Sales, Ramadan Deals, and more.
-        </p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Category Management
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Manage product categories and hierarchy ({categories.length} categories)
+          </p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Create Category
+        </button>
       </div>
 
-      {/* Create new */}
-      <Card className="glass border-border/50">
-        <CardContent className="p-4 flex gap-3">
-          <Input
-            placeholder="New collection name..."
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && newName.trim() && createCollection.mutate(newName.trim())}
-            className="flex-1"
-          />
-          <Button
-            onClick={() => newName.trim() && createCollection.mutate(newName.trim())}
-            disabled={!newName.trim() || createCollection.isPending}
-            className="gap-1.5"
-          >
-            <Plus className="h-4 w-4" /> Add Collection
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+            <AlertCircle className="w-5 h-5" />
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
 
-      {/* Collection List */}
-      <div className="space-y-3">
-        {collections.map((col) => {
-          const isExpanded = expandedId === col.id;
-          const products = getCollectionProducts(col.id);
-          const isEditing = editingId === col.id;
-          const isDragOver = dragOverCollection === col.id;
-
-          return (
-            <Card
-              key={col.id}
-              className={`glass border-border/50 transition-all ${isDragOver ? "ring-2 ring-primary/50" : ""}`}
-              draggable
-              onDragStart={() => setDraggedCollection(col.id)}
-              onDragEnd={() => { setDraggedCollection(null); setDragOverCollection(null); }}
-              onDragOver={(e) => { e.preventDefault(); setDragOverCollection(col.id); }}
-              onDragLeave={() => setDragOverCollection(null)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOverCollection(null);
-                if (draggedCollection && draggedCollection !== col.id) {
-                  reorderCollections(draggedCollection, col.id);
-                }
-              }}
-            >
-              <CardContent className="p-0">
-                {/* Collection Header */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab shrink-0" />
-
-                  {isEditing ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <Input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="h-8 text-sm flex-1"
-                        autoFocus
-                      />
-                      <Input
-                        value={editBadge}
-                        onChange={(e) => setEditBadge(e.target.value)}
-                        placeholder="Badge"
-                        className="h-8 text-sm w-20"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7"
-                        onClick={() =>
-                          updateCollection.mutate({
-                            id: col.id,
-                            updates: { name: editName, badge_text: editBadge || null },
-                          })
-                        }
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Layers className="h-4 w-4 text-primary shrink-0" />
-                          <span className="font-medium text-sm">{col.name}</span>
-                          {col.badge_text && (
-                            <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                              {col.badge_text}
-                            </Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground">({products.length} products)</span>
-                        </div>
-                        {col.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 ml-6">{col.description}</p>
+      {/* Categories Grid */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">No categories found</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
+                  editingCategory?.id === category.id
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                    : "border-gray-200 dark:border-gray-700"
+                }`}
+              >
+                {editingCategory?.id === category.id ? (
+                  <CategoryForm isEdit={true} />
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        {category.icon_url && (
+                          <img
+                            src={category.icon_url}
+                            alt={category.name}
+                            className="w-10 h-10 object-cover rounded"
+                          />
                         )}
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {category.name}
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            /{category.slug}
+                          </p>
+                        </div>
                       </div>
-                    </>
-                  )}
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          category.is_active
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        {category.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Switch
-                      checked={col.is_active}
-                      onCheckedChange={(checked) =>
-                        updateCollection.mutate({ id: col.id, updates: { is_active: checked } })
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={() => {
-                        setEditingId(col.id);
-                        setEditName(col.name);
-                        setEditBadge(col.badge_text || "");
-                      }}
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                      onClick={() => deleteCollection.mutate(col.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0"
-                      onClick={() => setExpandedId(isExpanded ? null : col.id)}
-                    >
-                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Expanded: Product list + add products */}
-                {isExpanded && (
-                  <div className="border-t border-border/50 px-4 py-3 space-y-3">
-                    {/* Current products */}
-                    {products.length > 0 ? (
-                      <div className="space-y-1">
-                        {products.map((p) => (
-                          <div
-                            key={p.id}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary/30 transition-all ${
-                              dragOverProduct === p.id ? "ring-1 ring-primary/50" : ""
-                            }`}
-                            draggable
-                            onDragStart={(e) => {
-                              e.stopPropagation();
-                              setDraggedProduct({ collectionId: col.id, productId: p.id });
-                            }}
-                            onDragEnd={() => { setDraggedProduct(null); setDragOverProduct(null); }}
-                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragOverProduct(p.id); }}
-                            onDragLeave={() => setDragOverProduct(null)}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setDragOverProduct(null);
-                              if (draggedProduct && draggedProduct.collectionId === col.id) {
-                                reorderProducts(col.id, draggedProduct.productId, p.id);
-                              }
-                            }}
-                          >
-                            <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab shrink-0" />
-                            <Package className="h-3.5 w-3.5 text-primary shrink-0" />
-                            <span className="text-sm flex-1 truncate">{p.name}</span>
-                            <span className="text-xs text-muted-foreground">{p.brand}</span>
-                            <span className="text-xs font-medium">{p.currency} {p.price.toLocaleString()}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                              onClick={() => removeProduct.mutate(p.cpId)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center py-2">
-                        No products in this collection. Search and add below.
+                    {category.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                        {category.description}
                       </p>
                     )}
 
-                    {/* Add products */}
-                    <div className="border-t border-border/30 pt-3">
-                      <div className="relative mb-2">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          placeholder="Search products to add..."
-                          value={productSearch}
-                          onChange={(e) => setProductSearch(e.target.value)}
-                          className="pl-9 h-8 text-sm"
-                        />
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Order: {category.display_order}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditCategory(category)}
+                          disabled={actionLoading}
+                          className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg disabled:opacity-50"
+                          title="Edit Category"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteCategory(category.id, category.name)
+                          }
+                          disabled={actionLoading}
+                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg disabled:opacity-50"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      {productSearch && (
-                        <div className="max-h-40 overflow-y-auto space-y-1">
-                          {getAvailableProducts(col.id).slice(0, 8).map((p) => (
-                            <button
-                              key={p.id}
-                              onClick={() => addProduct.mutate({ collectionId: col.id, productId: p.id })}
-                              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-secondary/50 transition-colors text-left"
-                            >
-                              <Plus className="h-3 w-3 text-primary shrink-0" />
-                              <span className="text-sm flex-1 truncate">{p.name}</span>
-                              <span className="text-xs text-muted-foreground">{p.brand}</span>
-                              <span className="text-xs">{p.currency} {p.price.toLocaleString()}</span>
-                            </button>
-                          ))}
-                          {getAvailableProducts(col.id).length === 0 && (
-                            <p className="text-xs text-muted-foreground text-center py-2">No matching products</p>
-                          )}
-                        </div>
-                      )}
                     </div>
-                  </div>
+                  </>
                 )}
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {collections.length === 0 && (
-          <Card className="glass border-border/50">
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <Tag className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-              <p>No collections yet. Create your first one above.</p>
-            </CardContent>
-          </Card>
+              </div>
+            ))}
+          </div>
         )}
       </div>
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+              Create New Category
+            </h2>
+            <CategoryForm />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

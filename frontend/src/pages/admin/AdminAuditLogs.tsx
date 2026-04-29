@@ -1,197 +1,320 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, History, User, Package, Store, DollarSign, Shield, Clock } from "lucide-react";
-import { format } from "date-fns";
+import { useEffect, useState } from "react";
+import {
+  FileText,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+} from "lucide-react";
+import * as adminService from "../../services/api/admin.service";
 
-const entityIcons: Record<string, any> = {
-  product: Package,
-  vendor: Store,
-  order: DollarSign,
-  user: User,
-  default: Shield,
-};
+interface AuditLog {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  details: Record<string, any> | null;
+  ip_address: string | null;
+  created_at: string;
+  user: {
+    id: string;
+    email: string;
+    full_name: string;
+  } | null;
+}
 
-const actionColors: Record<string, string> = {
-  create: "bg-emerald-500/20 text-emerald-400",
-  update: "bg-blue-500/20 text-blue-400",
-  delete: "bg-red-500/20 text-red-400",
-  approve: "bg-emerald-500/20 text-emerald-400",
-  suspend: "bg-amber-500/20 text-amber-400",
-  login: "bg-muted text-muted-foreground",
-};
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
 
 const AdminAuditLogs = () => {
-  const [search, setSearch] = useState("");
-  const [entityFilter, setEntityFilter] = useState("all");
-  const [actionFilter, setActionFilter] = useState("all");
-
-  const { data: logs = [], isLoading } = useQuery({
-    queryKey: ["audit-logs", entityFilter, actionFilter],
-    queryFn: async () => {
-      let query = supabase
-        .from("audit_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200);
-
-      if (entityFilter !== "all") query = query.eq("entity_type", entityFilter);
-      if (actionFilter !== "all") query = query.eq("action", actionFilter);
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    action: "",
+    entity_type: "",
   });
 
-  // Get profile names for user_ids
-  const userIds = [...new Set(logs.map((l: any) => l.user_id))];
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["audit-profiles", userIds],
-    queryFn: async () => {
-      if (userIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, email")
-        .in("user_id", userIds);
-      if (error) throw error;
-      return data;
-    },
-    enabled: userIds.length > 0,
-  });
+  useEffect(() => {
+    fetchLogs();
+  }, [pagination.page, pagination.limit, filters]);
 
-  const profileMap = Object.fromEntries(profiles.map((p: any) => [p.user_id, p]));
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const entityTypes = [...new Set(logs.map((l: any) => l.entity_type))].sort();
-  const actions = [...new Set(logs.map((l: any) => l.action))].sort();
+      const response = await adminService.getAuditLogs(
+        pagination.page,
+        pagination.limit,
+        {
+          action: filters.action || undefined,
+          entity_type: filters.entity_type || undefined,
+        }
+      );
 
-  const filtered = logs.filter((l: any) => {
-    if (!search) return true;
-    const profile = profileMap[l.user_id];
-    const name = profile?.display_name || profile?.email || "";
-    return (
-      name.toLowerCase().includes(search.toLowerCase()) ||
-      l.entity_type.toLowerCase().includes(search.toLowerCase()) ||
-      l.action.toLowerCase().includes(search.toLowerCase()) ||
-      (l.entity_id || "").toLowerCase().includes(search.toLowerCase())
-    );
-  });
+      setLogs(response.data.logs);
+      setPagination(response.data.pagination);
+    } catch (err: any) {
+      console.error("Failed to fetch audit logs:", err);
+      setError(err.response?.data?.message || "Failed to load audit logs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getActionBadgeColor = (action: string) => {
+    if (action.includes("DELETE")) {
+      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+    } else if (action.includes("CREATE")) {
+      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+    } else if (action.includes("UPDATE") || action.includes("FEATURE")) {
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
+    } else if (action.includes("BLOCK")) {
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
+    }
+    return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+  };
+
+  const formatAction = (action: string) => {
+    return action.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
+  };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-display font-bold">Audit Logs</h1>
-        <p className="text-sm text-muted-foreground">Complete history trail of all admin actions</p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="glass border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs text-muted-foreground">Total Events</CardTitle>
-            <History className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent><p className="text-2xl font-display font-bold">{logs.length}</p></CardContent>
-        </Card>
-        <Card className="glass border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs text-muted-foreground">Today's Actions</CardTitle>
-            <Clock className="h-4 w-4 text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-display font-bold text-emerald-400">
-              {logs.filter((l: any) => new Date(l.created_at).toDateString() === new Date().toDateString()).length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="glass border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs text-muted-foreground">Unique Users</CardTitle>
-            <User className="h-4 w-4 text-blue-400" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-display font-bold text-blue-400">{userIds.length}</p>
-          </CardContent>
-        </Card>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Audit Logs
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
+          Track all admin actions and system activities
+        </p>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by user, entity, action..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Filters
+            </h2>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+            >
+              <Filter className="w-4 h-4" />
+              {showFilters ? "Hide" : "Show"} Filters
+            </button>
+          </div>
+
+          {showFilters && (
+            <div className="flex gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <select
+                value={filters.action}
+                onChange={(e) => setFilters({ ...filters, action: e.target.value })}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">All Actions</option>
+                <option value="CREATE_CATEGORY">Create Category</option>
+                <option value="UPDATE_CATEGORY">Update Category</option>
+                <option value="DELETE_CATEGORY">Delete Category</option>
+                <option value="DELETE_PRODUCT">Delete Product</option>
+                <option value="FEATURE_PRODUCT">Feature Product</option>
+                <option value="UNFEATURE_PRODUCT">Unfeature Product</option>
+                <option value="ACTIVATE_USER">Activate User</option>
+                <option value="BLOCK_USER">Block User</option>
+                <option value="BULK_BLOCK_USER">Bulk Block User</option>
+                <option value="BULK_DELETE_USER">Bulk Delete User</option>
+              </select>
+
+              <select
+                value={filters.entity_type}
+                onChange={(e) =>
+                  setFilters({ ...filters, entity_type: e.target.value })
+                }
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">All Entity Types</option>
+                <option value="user">User</option>
+                <option value="product">Product</option>
+                <option value="category">Category</option>
+              </select>
+
+              <button
+                onClick={() => setFilters({ action: "", entity_type: "" })}
+                className="px-4 py-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
         </div>
-        <Select value={entityFilter} onValueChange={setEntityFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Entities</SelectItem>
-            {entityTypes.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={actionFilter} onValueChange={setActionFilter}>
-          <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Actions</SelectItem>
-            {actions.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-          </SelectContent>
-        </Select>
       </div>
 
-      {/* Timeline */}
-      <div className="space-y-2">
-        {isLoading ? (
-          <Card className="glass border-border/50">
-            <CardContent className="py-8 text-center text-muted-foreground">Loading audit trail...</CardContent>
-          </Card>
-        ) : filtered.length === 0 ? (
-          <Card className="glass border-border/50">
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <History className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-              <p>No audit events found. Actions will be recorded as admins use the panel.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filtered.map((log: any) => {
-            const Icon = entityIcons[log.entity_type] || entityIcons.default;
-            const profile = profileMap[log.user_id];
-            const userName = profile?.display_name || profile?.email || log.user_id.slice(0, 8);
-            const colorClass = actionColors[log.action] || "bg-muted text-muted-foreground";
-            const details = log.details || {};
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+            <AlertCircle className="w-5 h-5" />
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
 
-            return (
-              <Card key={log.id} className="glass border-border/50">
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className="mt-0.5 rounded-full bg-muted/50 p-2">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium">{userName}</span>
-                      <Badge className={`text-[10px] ${colorClass}`}>{log.action}</Badge>
-                      <Badge variant="outline" className="text-[10px]">{log.entity_type}</Badge>
-                      {log.entity_id && (
-                        <span className="text-[10px] text-muted-foreground font-mono">{log.entity_id.slice(0, 8)}…</span>
-                      )}
-                    </div>
-                    {Object.keys(details).length > 0 && (
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {details.field && <span>Changed <span className="font-medium text-foreground">{details.field}</span></span>}
-                        {details.old_value && <span> from <span className="text-red-400">{String(details.old_value)}</span></span>}
-                        {details.new_value && <span> to <span className="text-emerald-400">{String(details.new_value)}</span></span>}
-                        {details.description && <span>{details.description}</span>}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                    {format(new Date(log.created_at), "MMM d, HH:mm")}
-                  </span>
-                </CardContent>
-              </Card>
-            );
-          })
+      {/* Audit Logs Table */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">No audit logs found</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Timestamp
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Action
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Entity
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Details
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {logs.map((log) => (
+                    <tr
+                      key={log.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {new Date(log.created_at).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        {log.user ? (
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {log.user.full_name}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {log.user.email}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">
+                            System
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getActionBadgeColor(
+                            log.action
+                          )}`}
+                        >
+                          {formatAction(log.action)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white capitalize">
+                            {log.entity_type}
+                          </p>
+                          {log.entity_id && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                              {log.entity_id.substring(0, 8)}...
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {log.details && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {log.details.name && (
+                              <p>
+                                <span className="font-medium">Name:</span>{" "}
+                                {log.details.name}
+                              </p>
+                            )}
+                            {log.details.email && (
+                              <p>
+                                <span className="font-medium">Email:</span>{" "}
+                                {log.details.email}
+                              </p>
+                            )}
+                            {log.details.slug && (
+                              <p>
+                                <span className="font-medium">Slug:</span>{" "}
+                                {log.details.slug}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 flex items-center justify-between border-t border-gray-200 dark:border-gray-600">
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                {Math.min(pagination.page * pagination.limit, pagination.total)}{" "}
+                of {pagination.total} logs
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
+                  }
+                  disabled={pagination.page === 1}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {pagination.page} of {pagination.pages}
+                </span>
+                <button
+                  onClick={() =>
+                    setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
+                  }
+                  disabled={pagination.page === pagination.pages}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

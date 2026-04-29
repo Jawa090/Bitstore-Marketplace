@@ -13,13 +13,13 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "bitstores",
 
   // ⚠️ DEVELOPMENT ONLY - Auto-create tables from entities
-  synchronize: true,
+  synchronize: false,
   
   // Show SQL queries in dev for debugging
   logging: process.env.NODE_ENV === "development",
 
   // Entity & migration discovery paths
-  entities: [__dirname + "/../entities/**/*.{ts,js}"],
-  migrations: [__dirname + "/../migrations/**/*.{ts,js}"],
-  subscribers: [__dirname + "/../subscribers/**/*.{ts,js}"],
+  entities: [__dirname + "/entities/**/*.{ts,js}"],
+  migrations: [__dirname + "/migrations/**/*.{ts,js}"],
+  subscribers: [__dirname + "/subscribers/**/*.{ts,js}"],
 });

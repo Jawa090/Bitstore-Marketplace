@@ -130,7 +130,7 @@ const Signup = () => {
 
         <Card className="glass border-border/50">
           <CardContent className="pt-6 space-y-4">
-            <div className="flex justify-center">
+            <div className={`flex justify-center ${loading ? "opacity-50 pointer-events-none" : ""}`}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
                 onError={() =>

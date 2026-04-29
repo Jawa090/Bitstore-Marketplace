@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { productService } from "@/services/api/product.service";
+import { getCollectionBySlug } from "@/services/api/collection.service";
 
 type SortOption = "newest" | "price-asc" | "price-desc" | "name";
 
@@ -21,23 +21,58 @@ const CollectionPage = () => {
   const [sort, setSort] = useState<SortOption>("newest");
   const [brandFilter, setBrandFilter] = useState<string>("");
   const [conditionFilter, setConditionFilter] = useState<string>("");
+  const [page] = useState(1);
 
-  // For now, we'll fetch all products and filter client-side
-  // In a real implementation, you'd have a collections API
-  const { data: productsData, isLoading } = useQuery({
-    queryKey: ["collection-products", slug, search, sort, brandFilter, conditionFilter],
-    queryFn: () => productService.getProducts({
-      search: search || undefined,
-      brand_id: brandFilter || undefined,
-      condition: conditionFilter || undefined,
-      sort_by: sort === "price-asc" ? "price" : sort === "price-desc" ? "price" : sort === "name" ? "name" : "created_at",
-      sort_order: sort === "price-asc" ? "asc" : "desc",
-      limit: 50,
-    }),
+  // Fetch collection with products from backend API
+  const { data: collectionData, isLoading } = useQuery({
+    queryKey: ["collection", slug, page],
+    queryFn: () => getCollectionBySlug(slug!, page, 50),
     enabled: !!slug,
   });
 
-  const products = productsData?.products || [];
+  const collection = collectionData?.collection;
+  const allProducts = collectionData?.products || [];
+
+  // Client-side filtering and sorting
+  const products = useMemo(() => {
+    let filtered = [...allProducts];
+
+    // Search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter((p: any) =>
+        p.name?.toLowerCase().includes(searchLower) ||
+        p.brand?.name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Brand filter
+    if (brandFilter) {
+      filtered = filtered.filter((p: any) => p.brand?.name === brandFilter);
+    }
+
+    // Condition filter
+    if (conditionFilter) {
+      filtered = filtered.filter((p: any) => p.condition === conditionFilter);
+    }
+
+    // Sorting
+    filtered.sort((a: any, b: any) => {
+      switch (sort) {
+        case "price-asc":
+          return parseFloat(a.price) - parseFloat(b.price);
+        case "price-desc":
+          return parseFloat(b.price) - parseFloat(a.price);
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "newest":
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+
+    return filtered;
+  }, [allProducts, search, brandFilter, conditionFilter, sort]);
 
   const brands = useMemo(() => {
     const set = new Set(products.map((p: any) => p.brand?.name).filter(Boolean));
@@ -65,12 +100,9 @@ const CollectionPage = () => {
     refurbished: "Refurbished",
   };
 
-  // Mock collection data - in real app this would come from API
-  const collection = {
-    name: slug?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || "Collection",
-    description: "Discover our curated selection of premium products",
-    badge_text: "Featured"
-  };
+  if (!slug) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,7 +113,7 @@ const CollectionPage = () => {
         <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
           <Link to="/" className="hover:text-foreground transition-colors">Home</Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-foreground font-medium">{collection.name}</span>
+          <span className="text-foreground font-medium">{collection?.name || "Collection"}</span>
         </nav>
 
         {isLoading ? (
@@ -103,12 +135,12 @@ const CollectionPage = () => {
               className="mb-8"
             >
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl lg:text-4xl font-bold">{collection.name}</h1>
-                {collection.badge_text && (
-                  <Badge variant="secondary">{collection.badge_text}</Badge>
+                <h1 className="text-3xl lg:text-4xl font-bold">{collection?.name || "Collection"}</h1>
+                {collection?.banner_url && (
+                  <Badge variant="secondary">Featured</Badge>
                 )}
               </div>
-              {collection.description && (
+              {collection?.description && (
                 <p className="text-muted-foreground max-w-2xl">{collection.description}</p>
               )}
               <p className="text-sm text-muted-foreground mt-2">

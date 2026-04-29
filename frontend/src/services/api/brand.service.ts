@@ -17,19 +17,19 @@ export interface Brand {
 export const brandService = {
   // Get all brands
   getBrands: async (): Promise<Brand[]> => {
-    const response = await api.get('/brands');
+    const response = await api.get('/v1/brands');
     return response.data.data.brands || response.data.data; // Handle both formats
   },
 
   // Get brand by ID
   getBrandById: async (id: string): Promise<Brand> => {
-    const response = await api.get(`/brands/${id}`);
+    const response = await api.get(`/v1/brands/${id}`);
     return response.data.data.brand || response.data.data;
   },
 
   // Get brand by slug
   getBrandBySlug: async (slug: string): Promise<Brand> => {
-    const response = await api.get(`/brands/slug/${slug}`);
+    const response = await api.get(`/v1/brands/slug/${slug}`);
     return response.data.data.brand || response.data.data;
   }
 };

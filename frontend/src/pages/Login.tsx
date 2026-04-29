@@ -19,15 +19,44 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, user } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await login(email, password);
-      toast({ title: "Welcome back!", description: "You have been signed in successfully." });
-      navigate("/");
+      
+      // Fetch fresh user data with roles
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch('http://localhost:3000/api/users/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const userData = data.data.user;
+        const isAdmin = userData?.roles?.some((role: any) => role.role === 'admin');
+        
+        if (isAdmin) {
+          toast({ 
+            title: "Welcome back, Admin!", 
+            description: "Redirecting to admin dashboard..." 
+          });
+          navigate("/admin");
+        } else {
+          toast({ 
+            title: "Welcome back!", 
+            description: "You have been signed in successfully." 
+          });
+          navigate("/");
+        }
+      } else {
+        // Fallback if /me fails
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
         title: "Login failed",
@@ -45,8 +74,37 @@ const Login = () => {
     setLoading(true);
     try {
       await loginWithGoogle(idToken);
-      toast({ title: "Welcome back!", description: "Signed in with Google." });
-      navigate("/");
+      
+      // Fetch fresh user data with roles
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch('http://localhost:3000/api/users/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const userData = data.data.user;
+        const isAdmin = userData?.roles?.some((role: any) => role.role === 'admin');
+        
+        if (isAdmin) {
+          toast({ 
+            title: "Welcome back, Admin!", 
+            description: "Redirecting to admin dashboard..." 
+          });
+          navigate("/admin");
+        } else {
+          toast({ 
+            title: "Welcome back!", 
+            description: "Signed in with Google." 
+          });
+          navigate("/");
+        }
+      } else {
+        // Fallback if /me fails
+        navigate("/");
+      }
     } catch (error: any) {
       toast({
         title: "Google sign-in failed",
@@ -76,7 +134,7 @@ const Login = () => {
 
         <Card className="glass border-border/50">
           <CardContent className="pt-6 space-y-4">
-            <div className="flex justify-center">
+            <div className={`flex justify-center ${loading ? "opacity-50 pointer-events-none" : ""}`}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
                 onError={() =>
