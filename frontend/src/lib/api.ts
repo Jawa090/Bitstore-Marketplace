@@ -177,4 +177,19 @@ export const returnOrder = (id: string, data: { reason: string; comments?: strin
 export const createPaymentIntent = (orderId: string) =>
   api.post("/payments/create-intent", { orderId });
 
+// ── Vendor helpers ──────────────────────────────────────────────────
+export const checkVendorStatus = () => api.get("/vendor/check");
+export const applyForVendor = (data: any) => api.post("/vendor/apply", data);
+export const getVendorOverview = () => api.get("/vendor/overview");
+export const getVendorSettings = () => api.get("/vendor/settings");
+export const updateVendorSettings = (data: any) => api.put("/vendor/settings", data);
+export const getVendorProducts = () => api.get("/vendor/products");
+export const createVendorProduct = (data: any) => api.post("/vendor/products", data);
+export const updateVendorProduct = (id: string, data: any) => api.put(`/vendor/products/${id}`, data);
+export const deleteVendorProduct = (id: string) => api.delete(`/vendor/products/${id}`);
+export const getVendorOrders = () => api.get("/vendor/orders");
+export const updateVendorOrder = (id: string, data: any) => api.put(`/vendor/orders/${id}`, data);
+export const getVendorPayouts = () => api.get("/vendor/payouts");
+export const getVendorAnalytics = () => api.get("/vendor/analytics");
+
 export default api;

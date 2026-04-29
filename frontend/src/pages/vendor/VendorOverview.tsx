@@ -1,11 +1,28 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useVendor } from "@/components/vendor/VendorGuard";
-import { Package, DollarSign, AlertTriangle, TrendingUp, Clock, Banknote, CheckCircle } from "lucide-react";
+import { getVendorOverview, getVendorPayouts } from "@/lib/api";
+import { Package, DollarSign, AlertTriangle, TrendingUp, Clock, Banknote, CheckCircle, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-// Mock recent sales data
+// ── Types ───────────────────────────────────────────────────────────
+interface OverviewData {
+  total_products: number;
+  total_orders: number;
+  pending_orders: number;
+  total_revenue: number;
+}
+
+interface Payout {
+  id: string;
+  amount: number;
+  status: string;
+  notes: string | null;
+  created_at: string;
+}
+
+// Mock weekly chart data (will be replaced by analytics API later)
 const MOCK_WEEKLY = Array.from({ length: 7 }, (_, i) => {
   const d = new Date();
   d.setDate(d.getDate() - (6 - i));
@@ -17,51 +34,51 @@ const MOCK_WEEKLY = Array.from({ length: 7 }, (_, i) => {
 
 const VendorOverview = () => {
   const { vendor } = useVendor();
+  const [overview, setOverview] = useState<OverviewData | null>(null);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const { data: stats } = useQuery({
-    queryKey: ["vendor-overview-stats", vendor?.id],
-    queryFn: async () => {
-      const [products, orders] = await Promise.all([
-        supabase.from("products").select("id, price, stock_quantity", { count: "exact" }).eq("vendor_id", vendor!.id),
-        supabase.from("sub_orders").select("id, subtotal, status, created_at").eq("vendor_id", vendor!.id),
-      ]);
-      const totalProducts = products.count ?? 0;
-      const lowStock = products.data?.filter((p) => p.stock_quantity <= 5).length ?? 0;
-      const totalOrders = orders.data?.length ?? 0;
-      const totalRevenue = orders.data?.reduce((s, o) => s + Number(o.subtotal), 0) ?? 0;
-      const commission = totalRevenue * ((vendor?.commission_rate ?? 10) / 100);
-      const netPayout = totalRevenue - commission;
-      const pendingOrders = orders.data?.filter((o) => ["pending", "confirmed"].includes(o.status)).length ?? 0;
-      const recentOrders = orders.data
-        ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5) ?? [];
-      return { totalProducts, lowStock, totalOrders, totalRevenue, commission, netPayout, pendingOrders, recentOrders };
-    },
-    enabled: !!vendor?.id,
-  });
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [overviewRes, payoutsRes] = await Promise.all([
+          getVendorOverview(),
+          getVendorPayouts(),
+        ]);
+        setOverview(overviewRes.data?.data ?? null);
+        setPayouts(payoutsRes.data?.data?.payouts ?? []);
+        console.log("Vendor Overview Data:", overviewRes.data?.data);
+      } catch (err) {
+        console.error("Failed to fetch vendor overview:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
-  const { data: recentPayouts = [] } = useQuery({
-    queryKey: ["vendor-recent-payouts", vendor?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("vendor_payouts")
-        .select("*")
-        .eq("vendor_id", vendor!.id)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      return data || [];
-    },
-    enabled: !!vendor?.id,
-  });
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const totalPaid = recentPayouts.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
-  const totalPending = recentPayouts.filter(p => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+  const commissionRate = vendor?.commission_rate ?? 10;
+  const totalRevenue = overview?.total_revenue ?? 0;
+  const commission = totalRevenue * (commissionRate / 100);
+  const netPayout = totalRevenue - commission;
+
+  const totalPaid = payouts.filter((p) => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+  const totalPending = payouts.filter((p) => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+  const recentPayouts = payouts.slice(0, 5);
 
   const cards = [
-    { label: "Total Revenue", value: `AED ${(stats?.totalRevenue ?? 0).toLocaleString()}`, icon: DollarSign, sub: `Commission: AED ${(stats?.commission ?? 0).toLocaleString()}` },
-    { label: "Net Payout", value: `AED ${(stats?.netPayout ?? 0).toLocaleString()}`, icon: TrendingUp, sub: `${vendor?.commission_rate ?? 10}% commission rate` },
-    { label: "Active Products", value: stats?.totalProducts ?? 0, icon: Package, sub: stats?.lowStock ? `${stats.lowStock} low stock` : "All stocked" },
-    { label: "Pending Orders", value: stats?.pendingOrders ?? 0, icon: AlertTriangle, sub: `${stats?.totalOrders ?? 0} total orders` },
+    { label: "Total Revenue", value: `AED ${totalRevenue.toLocaleString()}`, icon: DollarSign, sub: `Commission: AED ${commission.toLocaleString()}` },
+    { label: "Net Payout", value: `AED ${netPayout.toLocaleString()}`, icon: TrendingUp, sub: `${commissionRate}% commission rate` },
+    { label: "Active Products", value: overview?.total_products ?? 0, icon: Package, sub: "Products in catalog" },
+    { label: "Pending Orders", value: overview?.pending_orders ?? 0, icon: AlertTriangle, sub: `${overview?.total_orders ?? 0} total orders` },
   ];
 
   return (
@@ -87,7 +104,7 @@ const VendorOverview = () => {
         ))}
       </div>
 
-      {/* Sales chart + Recent orders */}
+      {/* Sales chart + Recent Payouts */}
       <div className="grid lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 border-border">
           <CardContent className="p-5">
@@ -112,30 +129,6 @@ const VendorOverview = () => {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border">
-          <CardContent className="p-5">
-            <h3 className="font-semibold text-foreground mb-4">Recent Orders</h3>
-            {stats?.recentOrders?.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No orders yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {stats?.recentOrders?.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="text-foreground font-mono text-xs">#{order.id.slice(0, 8)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-foreground font-medium">AED {Number(order.subtotal).toLocaleString()}</span>
-                      <Badge variant="outline" className="text-[10px] capitalize">{order.status}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 

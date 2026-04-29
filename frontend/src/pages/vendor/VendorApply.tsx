@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +12,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
+import { applyForVendor } from "@/lib/api";
 
 const EMIRATES = [
   "Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain",
 ];
 
 const VendorApply = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, vendorStatus, vendor, refreshVendorStatus } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -30,20 +31,6 @@ const VendorApply = () => {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Check if user already has a vendor record
-  const { data: existingVendor, isLoading: checkingVendor } = useQuery({
-    queryKey: ["vendor-check", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("vendors")
-        .select("id, status, store_name")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      return data;
-    },
-  });
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -53,28 +40,32 @@ const VendorApply = () => {
     }
 
     setSubmitting(true);
-    const { error } = await supabase.from("vendors").insert({
-      user_id: user.id,
-      store_name: storeName.trim(),
-      emirate,
-      contact_email: contactEmail || null,
-      contact_phone: contactPhone || null,
-      address: address || null,
-      store_description: description || null,
-    });
-    setSubmitting(false);
-
-    if (error) {
-      toast({ title: "Application failed", description: error.message, variant: "destructive" });
-    } else {
-      // Assign vendor role
-      await supabase.from("user_roles").insert({ user_id: user.id, role: "vendor" as any });
+    try {
+      await applyForVendor({
+        store_name: storeName.trim(),
+        emirate,
+        contact_email: contactEmail || null,
+        contact_phone: contactPhone || null,
+        address: address || null,
+        store_description: description || null,
+      });
+      
+      // Refresh auth state to pick up the new pending vendor status
+      await refreshVendorStatus();
+      
       toast({ title: "Application submitted!", description: "We'll review your store and get back to you shortly." });
-      navigate("/vendor");
+    } catch (error: any) {
+      toast({ title: "Application failed", description: error.displayMessage || "Something went wrong.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (authLoading || checkingVendor) {
+  if (vendorStatus === 'approved') {
+    return <Navigate to="/vendor" replace />;
+  }
+
+  if (authLoading) {
     return (
       <>
         <Navbar />
@@ -101,23 +92,19 @@ const VendorApply = () => {
     );
   }
 
-  if (existingVendor) {
+  if (vendorStatus === "pending" || vendorStatus === "rejected" || vendorStatus === "suspended") {
     return (
       <>
         <Navbar />
         <div className="min-h-screen bg-background flex items-center justify-center pt-16 p-4">
           <div className="text-center max-w-sm">
             <Store className="h-12 w-12 text-primary mx-auto mb-4" />
-            <h1 className="text-2xl font-display font-bold text-foreground mb-2">Application {existingVendor.status === "approved" ? "Approved" : "Submitted"}</h1>
+            <h1 className="text-2xl font-display font-bold text-foreground mb-2">Application {vendorStatus === "rejected" ? "Rejected" : vendorStatus === "suspended" ? "Suspended" : "Submitted"}</h1>
             <p className="text-muted-foreground mb-2">
-              Your store <span className="text-primary font-medium">{existingVendor.store_name}</span> is currently{" "}
-              <span className="capitalize font-medium">{existingVendor.status}</span>.
+              Your store {vendor?.store_name && <span className="text-primary font-medium">{vendor.store_name}</span>} is currently{" "}
+              <span className="capitalize font-medium text-amber-500">{vendorStatus}</span>.
             </p>
-            {existingVendor.status === "approved" ? (
-              <Link to="/vendor"><Button className="mt-4">Go to Dashboard</Button></Link>
-            ) : (
-              <p className="text-xs text-muted-foreground mt-4">We'll notify you once your application is reviewed.</p>
-            )}
+            <p className="text-xs text-muted-foreground mt-4">We'll notify you once your application is reviewed.</p>
           </div>
         </div>
       </>

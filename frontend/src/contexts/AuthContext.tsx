@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import api from "@/lib/api";
+import api, { checkVendorStatus } from "@/lib/api";
 import { syncCartApi } from "@/lib/api";
 import { getGuestCartForSync, clearGuestCart } from "@/contexts/CartContext";
 
@@ -16,8 +16,20 @@ interface AuthUser {
   created_at: string;
 }
 
+interface VendorProfile {
+  id: string;
+  store_name: string;
+  status: "pending" | "approved" | "rejected" | "suspended";
+  is_bitstores: boolean;
+  created_at: string;
+}
+
+type VendorStatus = "approved" | "pending" | "rejected" | "suspended" | "none";
+
 interface AuthContextType {
   user: AuthUser | null;
+  vendor: VendorProfile | null;
+  vendorStatus: VendorStatus;
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -32,11 +44,14 @@ interface AuthContextType {
   }) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshVendorStatus: () => Promise<void>;
 }
 
 // ── Context ─────────────────────────────────────────────────────────
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  vendor: null,
+  vendorStatus: "none",
   loading: true,
   isAuthenticated: false,
   login: async () => {},
@@ -44,6 +59,7 @@ const AuthContext = createContext<AuthContextType>({
   signup: async () => {},
   signOut: async () => {},
   refreshUser: async () => {},
+  refreshVendorStatus: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -51,7 +67,30 @@ export const useAuth = () => useContext(AuthContext);
 // ── Provider ────────────────────────────────────────────────────────
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [vendor, setVendor] = useState<VendorProfile | null>(null);
+  const [vendorStatus, setVendorStatus] = useState<VendorStatus>("none");
   const [loading, setLoading] = useState(true);
+
+  // ── Fetch vendor status from /vendor/check ──────────────────────
+  const refreshVendorStatus = useCallback(async () => {
+    try {
+      const response = await checkVendorStatus();
+      const vendorData = response.data?.data?.vendor ?? null;
+      console.log("Vendor Status Fetched:", vendorData);
+
+      if (vendorData) {
+        setVendor(vendorData);
+        setVendorStatus(vendorData.status);
+      } else {
+        setVendor(null);
+        setVendorStatus("none");
+      }
+    } catch {
+      // Not a vendor or endpoint error — treat as non-vendor
+      setVendor(null);
+      setVendorStatus("none");
+    }
+  }, []);
 
   // ── Fetch current user from /users/me on app load ─────────────
   const refreshUser = useCallback(async () => {
@@ -62,6 +101,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const refreshToken = localStorage.getItem("refreshToken");
       if (!refreshToken) {
         setUser(null);
+        setVendor(null);
+        setVendorStatus("none");
         setLoading(false);
         return;
       }
@@ -78,6 +119,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         setUser(null);
+        setVendor(null);
+        setVendorStatus("none");
         setLoading(false);
         return;
       }
@@ -87,15 +130,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const response = await api.get("/users/me");
       setUser(response.data.data.user);
+
+      // Fetch vendor status after confirming auth
+      await refreshVendorStatus();
     } catch {
       // Token invalid even after refresh — clear
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       setUser(null);
+      setVendor(null);
+      setVendorStatus("none");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshVendorStatus]);
 
   // Run once on mount
   useEffect(() => {
@@ -124,6 +172,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("refreshToken", refreshToken);
     setUser(userData);
 
+    // Fetch vendor status immediately after login
+    await refreshVendorStatus();
+
     // Sync guest cart silently
     await syncGuestCartToBackend();
   };
@@ -136,6 +187,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("accessToken", accessToken);
     localStorage.setItem("refreshToken", refreshToken);
     setUser(userData);
+
+    // Fetch vendor status immediately after login
+    await refreshVendorStatus();
 
     // Sync guest cart silently
     await syncGuestCartToBackend();
@@ -164,6 +218,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     setUser(null);
+    setVendor(null);
+    setVendorStatus("none");
   };
 
   const isAuthenticated = !!user;
@@ -172,6 +228,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
+        vendor,
+        vendorStatus,
         loading,
         isAuthenticated,
         login,
@@ -179,6 +237,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signup,
         signOut,
         refreshUser,
+        refreshVendorStatus,
       }}
     >
       {children}

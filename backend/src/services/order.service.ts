@@ -8,9 +8,7 @@ import { ReturnRequest } from "../entities/ReturnRequest";
 import { AppError } from "../utils/AppError";
 import { OrderStatus, SubOrderStatus } from "../utils/constants";
 
-// ── Mock constants (replace with real Product/Vendor DB lookups later) ──
-const MOCK_UNIT_PRICE = 100.0;
-const MOCK_VENDOR_ID = "550e8400-e29b-41d4-a716-446655440000";
+
 
 // ─────────────────────────────────────────────────────────────────────────
 // Types
@@ -36,28 +34,33 @@ export const placeOrder = async (
   // ── 1. Fetch the user's cart ────────────────────────────────────────
   const cart = await AppDataSource.getRepository(Cart).findOne({
     where: { user_id: userId },
-    relations: ["items"],
+    relations: ["items", "items.product", "items.product.vendor"],
   });
 
   if (!cart || cart.items.length === 0) {
     throw new AppError("Cart is empty.", 400);
   }
 
-  // ── 2. Mock data hydration ──────────────────────────────────────────
-  // Group cart items by vendor_id. Currently all items fall under the
-  // same mock vendor; once the Product module lands, swap MOCK_VENDOR_ID
-  // for the real vendor resolved from the product catalogue.
+  // ── 2. Group cart items by real vendor ────────────────────────────────
   const vendorMap = new Map<string, CartItem[]>();
   for (const item of cart.items) {
-    const vendorId = MOCK_VENDOR_ID; // TODO: resolve from Product service
+    if (!item.product || !item.product.vendor) {
+      throw new AppError(
+        `Product or vendor data missing for cart item ${item.id}. Cannot place order.`,
+        400
+      );
+    }
+    const vendorId = item.product.vendor.id;
     const group = vendorMap.get(vendorId) ?? [];
     group.push(item);
     vendorMap.set(vendorId, group);
   }
 
-  // Calculate order totals
-  const itemCount = cart.items.reduce((sum, i) => sum + i.quantity, 0);
-  const subtotalRaw = itemCount * MOCK_UNIT_PRICE;
+  // Calculate order totals using real product prices
+  const subtotalRaw = cart.items.reduce(
+    (sum, i) => sum + i.quantity * Number(i.product.price),
+    0
+  );
   const vatAmount = parseFloat((subtotalRaw * 0.05).toFixed(2)); // 5% UAE VAT
   const codFee =
     payload.payment_method === "cod"
@@ -100,7 +103,7 @@ export const placeOrder = async (
     // Step B & C — One SubOrder per vendor, then OrderItems under it
     for (const [vendorId, vendorItems] of vendorMap) {
       const vendorSubtotal = vendorItems.reduce(
-        (sum, i) => sum + i.quantity * MOCK_UNIT_PRICE,
+        (sum, i) => sum + i.quantity * Number(i.product.price),
         0
       );
 
@@ -117,7 +120,7 @@ export const placeOrder = async (
           sub_order_id: savedSubOrder.id,
           product_id: ci.product_id,
           quantity: ci.quantity,
-          unit_price: String(MOCK_UNIT_PRICE),
+          unit_price: String(Number(ci.product.price)),
         })
       );
       await queryRunner.manager.save(OrderItem, orderItems);

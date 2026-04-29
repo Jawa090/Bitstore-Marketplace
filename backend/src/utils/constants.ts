@@ -57,6 +57,16 @@ export enum VendorStatus {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Trade License Status Enum
+// ─────────────────────────────────────────────────────────────────────
+export enum TradeLicenseStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  EXPIRED = "expired",
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // SubOrder Status Enum
 // Mirrors OrderStatus but without 'returned' (handled via ReturnRequest)
 // ─────────────────────────────────────────────────────────────────────

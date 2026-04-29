@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getVendorProducts, updateVendorProduct, deleteVendorProduct } from "@/lib/api";
 import { useVendor } from "@/components/vendor/VendorGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,21 +45,15 @@ const VendorProducts = () => {
   const { data: products, isLoading } = useQuery({
     queryKey: ["vendor-products", vendor?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, images:product_images(image_url, is_primary)")
-        .eq("vendor_id", vendor!.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      const response = await getVendorProducts();
+      return response.data?.data?.products || [];
     },
     enabled: !!vendor?.id,
   });
 
   const toggleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await supabase.from("products").update({ is_active }).eq("id", id);
-      if (error) throw error;
+      await updateVendorProduct(id, { is_active });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendor-products"] });
@@ -68,8 +63,7 @@ const VendorProducts = () => {
 
   const deleteProduct = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
+      await deleteVendorProduct(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendor-products"] });

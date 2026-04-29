@@ -7,6 +7,7 @@ import {
   CreateDateColumn,
 } from "typeorm";
 import { Cart } from "./Cart";
+import { Product } from "./Product";
 
 @Entity("cart_items")
 export class CartItem {
@@ -21,11 +22,13 @@ export class CartItem {
   @JoinColumn({ name: "cart_id" })
   cart: Cart;
 
-  // ── Product (loosely coupled — no FK constraint) ───────────────────
-  // The Product entity doesn't exist yet; we store the UUID as a plain
-  // column so we avoid migration conflicts with the products team.
+  // ── Product ────────────────────────────────────────────────────────
   @Column({ type: "uuid" })
   product_id: string;
+
+  @ManyToOne(() => Product)
+  @JoinColumn({ name: "product_id" })
+  product: Product;
 
   // ── Quantity ───────────────────────────────────────────────────────
   @Column({ type: "int", default: 1 })

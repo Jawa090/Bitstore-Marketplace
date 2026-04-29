@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { User } from '../entities/User';
+import { Vendor } from '../entities/Vendor';
 
 /**
  * Extends the Express Request to include the authenticated user.
@@ -11,4 +12,5 @@ import { User } from '../entities/User';
  */
 export interface AuthRequest extends Request {
   user?: Omit<User, 'password_hash'>;
+  vendor?: Vendor;
 }

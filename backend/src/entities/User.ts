@@ -5,8 +5,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   Index,
+  OneToOne,
 } from "typeorm";
 import { Emirate } from "../utils/constants";
+import { Vendor } from "./Vendor";
 
 @Entity("users")
 export class User {
@@ -52,6 +54,10 @@ export class User {
 
   @Column({ type: "boolean", default: false })
   email_verified: boolean;
+
+  // ── Vendor Profile ───────────────────────────────────────────────
+  @OneToOne(() => Vendor, (vendor) => vendor.user)
+  vendor: Vendor;
 
   // ── Timestamps ──────────────────────────────────────────────────
   @CreateDateColumn({ type: "timestamptz" })

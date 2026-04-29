@@ -48,7 +48,11 @@ const Navbar = () => {
   const [selectedLanguage, setSelectedLanguage] = useState("EN");
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [currentLocation, setCurrentLocation] = useState("Dubai");
-  const { user, signOut } = useAuth();
+  const { user, signOut, vendorStatus } = useAuth();
+
+  // Dynamic vendor link based on status
+  const vendorLinkUrl = vendorStatus === "approved" ? "/vendor" : "/vendor/apply";
+  const vendorLinkLabel = vendorStatus === "approved" ? "Vendor Dashboard" : vendorStatus === "pending" ? "Application Pending" : "Sell on BitStores";
   const { totalItems } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
@@ -356,16 +360,13 @@ const Navbar = () => {
 
           {/* Vendor Link */}
           <div className="flex-1" />
-          {rightLinks.map((link) => (
-            <Link 
-              key={link.label} 
-              to={link.url} 
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded font-semibold whitespace-nowrap text-xs border border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200 shrink-0"
-            >
-              <Store className="h-3.5 w-3.5" />
-              {link.label}
-            </Link>
-          ))}
+          <Link 
+            to={vendorLinkUrl} 
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded font-semibold whitespace-nowrap text-xs border border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-200 shrink-0"
+          >
+            <Store className="h-3.5 w-3.5" />
+            {vendorLinkLabel}
+          </Link>
         </div>
       </div>
 
@@ -479,17 +480,14 @@ const Navbar = () => {
               </div>
 
               {/* Vendor Link */}
-              {rightLinks.map((link) => (
-                <Link 
-                  key={link.label} 
-                  to={link.url} 
-                  className="flex items-center justify-center gap-2 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm mb-3" 
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Store className="h-4 w-4" />
-                  {link.label}
-                </Link>
-              ))}
+              <Link 
+                to={vendorLinkUrl} 
+                className="flex items-center justify-center gap-2 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm mb-3" 
+                onClick={() => setMobileOpen(false)}
+              >
+                <Store className="h-4 w-4" />
+                {vendorLinkLabel}
+              </Link>
 
               {/* Account Actions */}
               <div className="border-t border-border pt-3 space-y-1">
